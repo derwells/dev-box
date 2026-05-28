@@ -26,6 +26,8 @@ tofu init          # install providers
 tofu plan          # preview changes
 tofu apply         # create/update server
 tofu destroy       # tear down everything
+hcloud server list # check server status via Hetzner CLI
+hcloud server ssh dev-box # SSH via hcloud (requires hcloud context)
 ```
 
 ## Conventions

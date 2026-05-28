@@ -21,6 +21,7 @@ Ubuntu Server 24.04
 ## Prerequisites
 
 - [OpenTofu](https://opentofu.org/docs/intro/install/) installed locally
+- [Hetzner CLI](https://github.com/hetznercloud/cli) (`hcloud`) for server management
 - A [Hetzner Cloud](https://console.hetzner.cloud) account with an API token
 - [Tailscale](https://tailscale.com) account (free for personal use)
 - An SSH key pair (`~/.ssh/id_ed25519` by default)
@@ -37,7 +38,13 @@ Edit `terraform.tfvars` with:
 - Your Hetzner API token (create at Hetzner Console → Security → API Tokens)
 - Optionally, a [Tailscale auth key](https://login.tailscale.com/admin/settings/keys) for automatic device registration
 
-### 2. Deploy
+### 2. Set up Hetzner CLI
+
+```bash
+hcloud context create dev-box    # paste your Hetzner API token when prompted
+```
+
+### 3. Deploy
 
 ```bash
 tofu init
@@ -46,7 +53,7 @@ tofu apply
 
 This creates the server and runs cloud-init, which installs everything. Takes ~5 minutes.
 
-### 3. Post-deploy (one-time)
+### 4. Post-deploy (one-time)
 
 If you didn't provide a Tailscale auth key:
 
@@ -64,7 +71,7 @@ vncpasswd                     # set password, say "no" to view-only
 sudo systemctl enable --now vncserver@1 novnc
 ```
 
-### 4. Connect
+### 5. Connect
 
 Add to `~/.ssh/config` on your laptop:
 
@@ -82,10 +89,13 @@ Host dev-box
 | Phone  | SSH app via Tailscale                   | Quick checks, monitoring      |
 | Phone  | `http://<tailscale-ip>:6080` in browser | Visual verification           |
 
-## Destroy
+## Server Management
 
 ```bash
-tofu destroy
+hcloud server list              # check status
+hcloud server ssh dev-box       # SSH via hcloud
+hcloud server reboot dev-box    # reboot
+tofu destroy                    # tear down everything
 ```
 
 ## Costs
