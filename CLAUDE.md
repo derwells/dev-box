@@ -30,6 +30,13 @@ hcloud server list # check server status via Hetzner CLI
 hcloud server ssh dev-box # SSH via hcloud (requires hcloud context)
 ```
 
+## Post-deploy login (one-time on server)
+
+```bash
+gh auth login      # GitHub auth (headless URL flow)
+claude login       # Claude Code auth (headless URL flow)
+```
+
 ## Conventions
 
 - Use OpenTofu, not Terraform

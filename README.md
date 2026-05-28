@@ -11,6 +11,11 @@ Hetzner CPX31 (4 vCPU, 8GB RAM, ~$12/mo)
 Ubuntu Server 24.04
 ├── Tailscale          — private mesh networking, no public ports
 ├── Claude Code        — Node.js + npm
+│   ├── GSD            — get-shit-done workflow skills + hooks
+│   ├── Superpowers    — plugin (official marketplace)
+│   ├── Context7       — plugin (official marketplace)
+│   └── Humanizer      — writing skill
+├── GitHub CLI         — gh auth, PRs, issues
 ├── Playwright         — headless browser for automated screenshots
 ├── XFCE4             — lightweight desktop (~200MB)
 ├── TigerVNC          — serves the desktop session
@@ -55,19 +60,25 @@ This creates the server and runs cloud-init, which installs everything. Takes ~5
 
 ### 4. Post-deploy (one-time)
 
-If you didn't provide a Tailscale auth key:
+SSH into the server:
 
 ```bash
 ssh <username>@<public-ip>    # from tofu output
+```
+
+If you didn't provide a Tailscale auth key:
+
+```bash
 sudo tailscale up --ssh
 ```
 
 Approve the device in the [Tailscale admin console](https://login.tailscale.com/admin/machines).
 
-Log in to Claude Code:
+Log in to services (each gives you a URL to open in any browser):
 
 ```bash
-claude login                  # open URL in browser, paste code back
+gh auth login                 # GitHub — clone, push, PRs
+claude login                  # Claude Code — AI assistant
 ```
 
 Set a VNC password and start the desktop:
@@ -84,7 +95,7 @@ Add to `~/.ssh/config` on your laptop:
 ```
 Host dev-box
     HostName <tailscale-ip-or-hostname>
-    User derick
+    User <username>
     ForwardAgent yes
 ```
 
