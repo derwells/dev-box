@@ -47,7 +47,46 @@ runcmd:
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && fnm install --lts && fnm use --lts'
 
   # Claude Code
-  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npm install -g @anthropic-ai/claude-code'
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npm install -g @anthropic-ai/claude-code get-shit-done-cc'
+
+  # GSD (registers skills + hooks into ~/.claude/)
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && GSD_PORTABLE_HOOKS=1 npx get-shit-done-cc@latest --claude --global'
+
+  # Claude Code settings (GSD may have written hooks already, so merge carefully)
+  - su - ${username} -c 'mkdir -p /home/${username}/.claude'
+  - |
+    cat > /tmp/claude-settings-patch.js << 'PATCHSCRIPT'
+    const fs = require('fs');
+    const settingsPath = process.env.HOME + '/.claude/settings.json';
+    let settings = {};
+    try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch {}
+    Object.assign(settings, {
+      effortLevel: "medium",
+      promptSuggestionEnabled: false,
+      tui: "fullscreen",
+      autoMemoryEnabled: false,
+      skipDangerousModePermissionPrompt: true,
+      theme: "light"
+    });
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    PATCHSCRIPT
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && node /tmp/claude-settings-patch.js'
+  - rm /tmp/claude-settings-patch.js
+  - |
+    cat > /home/${username}/.claude/CLAUDE.md << 'CLAUDEMD'
+    # graphify
+    - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
+    When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
+    CLAUDEMD
+
+  # Skills: humanizer
+  - su - ${username} -c 'git clone https://github.com/blader/humanizer.git /home/${username}/.claude/skills/humanizer'
+
+  # Plugins: add marketplace, then install
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && claude plugin marketplace add anthropics/claude-plugins-official'
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && claude plugin install superpowers@claude-plugins-official'
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && claude plugin install context7@claude-plugins-official'
+  - chown -R ${username}:${username} /home/${username}/.claude
 
   # Playwright
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npx playwright install --with-deps'

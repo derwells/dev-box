@@ -15,7 +15,7 @@ Remote development server provisioned with OpenTofu on Hetzner Cloud. One comman
 - `main.tf` — server, SSH key, firewall resources
 - `variables.tf` — all configurable inputs
 - `outputs.tf` — public IP, SSH command after deploy
-- `cloud-init.yaml.tftpl` — full server provisioning (Tailscale, Node.js, Claude Code, Playwright, desktop env)
+- `cloud-init.yaml.tftpl` — full server provisioning (Tailscale, Node.js, Claude Code, GSD, Playwright, desktop env)
 - `terraform.tfvars` — secrets (gitignored)
 - `terraform.tfvars.example` — template for secrets
 

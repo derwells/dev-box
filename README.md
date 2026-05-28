@@ -64,6 +64,12 @@ sudo tailscale up --ssh
 
 Approve the device in the [Tailscale admin console](https://login.tailscale.com/admin/machines).
 
+Log in to Claude Code:
+
+```bash
+claude login                  # open URL in browser, paste code back
+```
+
 Set a VNC password and start the desktop:
 
 ```bash
