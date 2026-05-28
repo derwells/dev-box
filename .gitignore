@@ -1,0 +1,13 @@
+# OpenTofu / Terraform
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+.terraform/
+.terraform.lock.hcl
+
+# Secrets
+terraform.tfvars
+*.auto.tfvars
+
+# OS
+.DS_Store

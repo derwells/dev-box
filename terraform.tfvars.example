@@ -1,0 +1,9 @@
+hcloud_token        = "your-hetzner-api-token"
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+username            = "derick"
+server_type         = "cpx31"
+location            = "ash"
+
+# Optional: generate at https://login.tailscale.com/admin/settings/keys
+# If provided, Tailscale joins automatically. If not, run `sudo tailscale up --ssh` after first login.
+tailscale_auth_key  = ""

@@ -1,0 +1,105 @@
+#cloud-config
+
+users:
+  - name: ${username}
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${file("~/.ssh/id_ed25519.pub")}
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ufw
+  - xfce4
+  - xfce4-goodies
+  - dbus-x11
+  - tigervnc-standalone-server
+  - tigervnc-common
+  - novnc
+  - websockify
+  - chromium-browser
+  - git
+  - curl
+  - unzip
+  - jq
+
+runcmd:
+  # Tailscale
+  - curl -fsSL https://tailscale.com/install.sh | sh
+%{ if tailscale_auth_key != "" ~}
+  - tailscale up --ssh --authkey=${tailscale_auth_key}
+%{ else ~}
+  # No auth key provided — run `sudo tailscale up --ssh` manually after first login
+%{ endif ~}
+
+  # Firewall (UFW)
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow in on tailscale0
+  - ufw allow 22/tcp
+  - ufw --force enable
+
+  # Node.js via fnm
+  - su - ${username} -c 'curl -fsSL https://fnm.vercel.app/install | bash'
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && fnm install --lts && fnm use --lts'
+
+  # Claude Code
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npm install -g @anthropic-ai/claude-code'
+
+  # Playwright
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npx playwright install --with-deps'
+
+  # VNC setup
+  - su - ${username} -c 'mkdir -p /home/${username}/.vnc'
+  - |
+    cat > /home/${username}/.vnc/xstartup << 'XSTARTUP'
+    #!/bin/sh
+    unset SESSION_MANAGER
+    unset DBUS_SESSION_BUS_ADDRESS
+    exec startxfce4
+    XSTARTUP
+  - chmod +x /home/${username}/.vnc/xstartup
+  - chown -R ${username}:${username} /home/${username}/.vnc
+
+  # VNC systemd service
+  - |
+    cat > /etc/systemd/system/vncserver@.service << 'VNCUNIT'
+    [Unit]
+    Description=TigerVNC server on display %i
+    After=syslog.target network.target tailscaled.service
+
+    [Service]
+    Type=forking
+    User=${username}
+    WorkingDirectory=/home/${username}
+    ExecStartPre=/bin/sh -c 'sleep 5'
+    ExecStart=/usr/bin/vncserver :%i -localhost no -geometry 1920x1080 -depth 24
+    ExecStop=/usr/bin/vncserver -kill :%i
+
+    [Install]
+    WantedBy=multi-user.target
+    VNCUNIT
+
+  # noVNC systemd service
+  - |
+    cat > /etc/systemd/system/novnc.service << 'NOVNCUNIT'
+    [Unit]
+    Description=noVNC websocket proxy
+    After=vncserver@1.service
+
+    [Service]
+    Type=simple
+    User=${username}
+    ExecStart=/usr/bin/websockify --web /usr/share/novnc 6080 localhost:5901
+    Restart=on-failure
+
+    [Install]
+    WantedBy=multi-user.target
+    NOVNCUNIT
+
+  - systemctl daemon-reload
+  # VNC requires a password — user must run `vncpasswd` before enabling
+  # Then: sudo systemctl enable --now vncserver@1 novnc
