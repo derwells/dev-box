@@ -140,8 +140,11 @@ runcmd:
 
     # Claude Code attention icons (set by Notification/Stop hooks via @ci)
     # 🔔 = needs your input, ✅ = finished a turn, empty = working / already seen
+    # Mark the active window with brackets + bold (color-free, so it reads on
+    # any terminal theme — overriding the formats dropped the default highlight)
     setw -g window-status-format         '#{@ci}#I:#W'
-    setw -g window-status-current-format '#{@ci}#I:#W'
+    setw -g window-status-current-format '#{@ci}[#I:#W]'
+    setw -g window-status-current-style  'bold'
 
     # Clear the icon as soon as you focus that pane/window
     set -g focus-events on
