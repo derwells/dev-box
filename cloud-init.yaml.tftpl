@@ -25,6 +25,7 @@ packages:
   - curl
   - unzip
   - jq
+  - tmux
 
 runcmd:
   # GitHub CLI
@@ -82,6 +83,16 @@ runcmd:
       skipDangerousModePermissionPrompt: true,
       theme: "light"
     });
+    // Claude Code attention icons: set a tmux window var that ~/.tmux.conf
+    // renders (🔔 = needs input, ✅ = finished). Merge into hooks without
+    // clobbering GSD's own hooks (SessionStart/PreToolUse/PostToolUse).
+    settings.hooks = settings.hooks || {};
+    settings.hooks.Notification = [
+      { hooks: [{ type: "command", command: "[ -n \"$TMUX_PANE\" ] && tmux set -w -t \"$TMUX_PANE\" @ci '🔔 ' || true" }] }
+    ];
+    settings.hooks.Stop = [
+      { hooks: [{ type: "command", command: "[ -n \"$TMUX_PANE\" ] && tmux set -w -t \"$TMUX_PANE\" @ci '✅ ' || true" }] }
+    ];
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
     PATCHSCRIPT
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && node /tmp/claude-settings-patch.js'
@@ -92,6 +103,51 @@ runcmd:
     - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
     When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
     CLAUDEMD
+
+  # tmux config (mirrors local ~/.tmux.conf)
+  - |
+    cat > /home/${username}/.tmux.conf << 'TMUXCONF'
+    # Mouse support (click panes, resize, scroll)
+    set -g mouse on
+
+    # Start window/pane numbering at 1 (0 is far from the other keys)
+    set -g base-index 1
+    setw -g pane-base-index 1
+
+    # Renumber windows when one is closed
+    set -g renumber-windows on
+
+    # More scrollback history
+    set -g history-limit 10000
+
+    # Faster escape (default 500ms feels laggy)
+    set -sg escape-time 10
+
+    # Split panes with | and - (easier to remember than % and ")
+    bind | split-window -h -c "#{pane_current_path}"
+    bind - split-window -v -c "#{pane_current_path}"
+
+    # New windows open in the same directory
+    bind c new-window -c "#{pane_current_path}"
+
+    # Reload config with r
+    bind r source-file ~/.tmux.conf \; display "Config reloaded"
+
+    # Status bar - clean and minimal
+    set -g status-style 'bg=default fg=white'
+    set -g status-left '[#S] '
+    set -g status-right ''
+
+    # Claude Code attention icons (set by Notification/Stop hooks via @ci)
+    # 🔔 = needs your input, ✅ = finished a turn, empty = working / already seen
+    setw -g window-status-format         '#{@ci}#I:#W'
+    setw -g window-status-current-format '#{@ci}#I:#W'
+
+    # Clear the icon as soon as you focus that pane/window
+    set -g focus-events on
+    set-hook -g pane-focus-in 'set -uw @ci'
+    TMUXCONF
+  - chown ${username}:${username} /home/${username}/.tmux.conf
 
   # Skills: humanizer
   - su - ${username} -c 'git clone https://github.com/blader/humanizer.git /home/${username}/.claude/skills/humanizer'
