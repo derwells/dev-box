@@ -33,6 +33,14 @@ runcmd:
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
   - apt-get update -qq && apt-get install -y gh
 
+  # GitHub auth (headless) — lets git/gh clone private repos without an interactive login
+%{ if github_token != "" ~}
+  - su - ${username} -c 'echo "${github_token}" | gh auth login --with-token'
+  - su - ${username} -c 'gh auth setup-git'
+%{ else ~}
+  # No github_token provided — run `gh auth login` manually after first login
+%{ endif ~}
+
   # Tailscale
   - curl -fsSL https://tailscale.com/install.sh | sh
 %{ if tailscale_auth_key != "" ~}

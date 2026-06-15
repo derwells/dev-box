@@ -33,9 +33,11 @@ hcloud server ssh dev-box # SSH via hcloud (requires hcloud context)
 ## Post-deploy login (one-time on server)
 
 ```bash
-gh auth login      # GitHub auth (headless URL flow)
+gh auth login      # GitHub auth — SKIP if github_token is set in tfvars (gh is auto-authed at provision)
 claude login       # Claude Code auth (headless URL flow)
 ```
+
+Set `github_token` in `terraform.tfvars` (fine-grained, repo-scoped PAT) to clone private repos without an interactive login. The token lands in cloud-init user-data, so scope it tightly and rotate it.
 
 ## Conventions
 

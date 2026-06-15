@@ -63,6 +63,7 @@ resource "hcloud_server" "dev_box" {
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
     username       = var.username
     tailscale_auth_key = var.tailscale_auth_key
+    github_token       = var.github_token
   })
 
   public_net {

@@ -34,3 +34,10 @@ variable "tailscale_auth_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "github_token" {
+  description = "GitHub PAT (fine-grained, repo-scoped, with expiry) for headless `gh` auth so private repos can be cloned. Leave empty to run `gh auth login` manually after deploy."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

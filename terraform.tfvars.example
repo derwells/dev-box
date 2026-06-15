@@ -7,3 +7,9 @@ location            = "ash"
 # Optional: generate at https://login.tailscale.com/admin/settings/keys
 # If provided, Tailscale joins automatically. If not, run `sudo tailscale up --ssh` after first login.
 tailscale_auth_key  = ""
+
+# Optional: fine-grained GitHub PAT (repo-scoped, with an expiry) — https://github.com/settings/tokens
+# If provided, `gh` is authenticated at provision time so private repos clone without interaction.
+# If not, run `gh auth login` manually after first login.
+# NOTE: a token here is stored in the server's cloud-init user-data. Scope it tightly and rotate it.
+github_token        = ""
