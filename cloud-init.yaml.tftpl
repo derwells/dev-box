@@ -64,6 +64,42 @@ runcmd:
   # Claude Code
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npm install -g @anthropic-ai/claude-code get-shit-done-cc'
 
+  # claudex — launch Claude Code routed to Xiaomi MiMo (token plan)
+  # Same binary as `claude`, but overrides the endpoint + per-tier models inline.
+  # Token comes from MIMO_API_KEY or ~/.claude/mimo_token (you add it post-deploy).
+  - |
+    cat > /usr/local/bin/claudex << 'CLAUDEX'
+    #!/usr/bin/env bash
+    # claudex — Claude Code routed to Xiaomi MiMo (token plan)
+    # Opus -> mimo-v2.5-pro   |   Sonnet/Haiku -> mimo-v2.5
+    set -eo pipefail
+
+    # Token: MIMO_API_KEY env override, else ~/.claude/mimo_token
+    token="$MIMO_API_KEY"
+    if [ -z "$token" ] && [ -f "$HOME/.claude/mimo_token" ]; then
+      token="$(tr -d '[:space:]' < "$HOME/.claude/mimo_token")"
+    fi
+    if [ -z "$token" ]; then
+      echo "claudex: no MiMo token. Set MIMO_API_KEY or write your tp-... token to ~/.claude/mimo_token" >&2
+      exit 1
+    fi
+
+    # Ensure the fnm-managed claude is reachable in non-interactive shells too
+    if ! command -v claude >/dev/null 2>&1; then
+      export PATH="$HOME/.local/share/fnm:$PATH"
+      command -v fnm >/dev/null 2>&1 && eval "$(fnm env)"
+    fi
+
+    export ANTHROPIC_BASE_URL="https://token-plan-sgp.xiaomimimo.com/anthropic"
+    export ANTHROPIC_AUTH_TOKEN="$token"
+    export ANTHROPIC_DEFAULT_OPUS_MODEL="mimo-v2.5-pro"
+    export ANTHROPIC_DEFAULT_SONNET_MODEL="mimo-v2.5"
+    export ANTHROPIC_DEFAULT_HAIKU_MODEL="mimo-v2.5"
+
+    exec claude "$@"
+    CLAUDEX
+  - chmod +x /usr/local/bin/claudex
+
   # GSD (registers skills + hooks into ~/.claude/)
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && GSD_PORTABLE_HOOKS=1 npx get-shit-done-cc@latest --claude --global'
 

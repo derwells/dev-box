@@ -39,6 +39,8 @@ claude login       # Claude Code auth (headless URL flow)
 
 Set `github_token` in `terraform.tfvars` (fine-grained, repo-scoped PAT) to clone private repos without an interactive login. The token lands in cloud-init user-data, so scope it tightly and rotate it.
 
+`claudex` is a provisioned wrapper that runs Claude Code against Xiaomi MiMo (token plan): Opus → `mimo-v2.5-pro`, Sonnet/Haiku → `mimo-v2.5`. It reads the key from `MIMO_API_KEY` or `~/.claude/mimo_token` (add it manually post-deploy — never in tfvars). Plain `claude` stays on Anthropic.
+
 ## Conventions
 
 - Use OpenTofu, not Terraform

@@ -78,8 +78,29 @@ Log in to services (each gives you a URL to open in any browser):
 
 ```bash
 gh auth login                 # GitHub — clone, push, PRs
-claude login                  # Claude Code — AI assistant
+claude login                  # Claude Code — AI assistant (Anthropic)
 ```
+
+#### Optional: `claudex` (Claude Code routed to Xiaomi MiMo)
+
+`claudex` runs the same Claude Code binary against Xiaomi MiMo's token-plan endpoint, with this
+tier mapping: Opus → `mimo-v2.5-pro`, Sonnet/Haiku → `mimo-v2.5`. Plain `claude` is unaffected.
+
+Add your token-plan key once (looks like `tp-...`):
+
+```bash
+echo "tp-xxxxx" > ~/.claude/mimo_token && chmod 600 ~/.claude/mimo_token
+```
+
+Then:
+
+```bash
+claudex                       # interactive, Sonnet tier -> mimo-v2.5
+claudex --model opus          # -> mimo-v2.5-pro
+claudex -p "..."              # headless
+```
+
+A `MIMO_API_KEY` in the environment overrides the file.
 
 Set a VNC password and start the desktop:
 
