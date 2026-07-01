@@ -41,6 +41,8 @@ Set `github_token` in `terraform.tfvars` (fine-grained, repo-scoped PAT) to clon
 
 `claudex` is a provisioned wrapper that runs Claude Code against Xiaomi MiMo (token plan): Opus → `mimo-v2.5-pro`, Sonnet/Haiku → `mimo-v2.5`. It reads the key from `MIMO_API_KEY` or `~/.claude/mimo_token` (add it manually post-deploy — never in tfvars). Plain `claude` stays on Anthropic.
 
+Web search under `claudex` goes through a provisioned MCP bridge (`~/.claude/mimo-search-mcp.mjs` + `search_mcp.json`) that calls MiMo's pay-as-you-go search plugin — Claude Code's built-in `WebSearch` is Anthropic-only and doesn't work via MiMo. The bridge is dormant until you add a separate PAYG key at `~/.claude/mimo_paygo_token` (`sk-...`, billed outside the token plan). When present, `claudex` loads the bridge and disables the built-in `WebSearch`.
+
 ## Conventions
 
 - Use OpenTofu, not Terraform

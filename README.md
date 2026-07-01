@@ -102,6 +102,22 @@ claudex -p "..."              # headless
 
 A `MIMO_API_KEY` in the environment overrides the file.
 
+**Web search (optional, pay-as-you-go).** Claude Code's built-in `WebSearch` is server-side and
+Anthropic-only, so it doesn't work through MiMo. `claudex` instead routes search through a small
+MCP bridge (`~/.claude/mimo-search-mcp.mjs`, wired via `~/.claude/search_mcp.json`) that calls
+MiMo's web-search plugin. This is **not** covered by the token plan — it needs a separate
+pay-as-you-go key (`sk-...`) with account balance (~$5 per 1,000 searches + tokens) and the
+web-search plugin enabled in the [MiMo console](https://platform.xiaomimimo.com/#/console/plugin):
+
+```bash
+echo "sk-xxxxx" > ~/.claude/mimo_paygo_token && chmod 600 ~/.claude/mimo_paygo_token
+```
+
+Once the key is present, `claudex` auto-loads the bridge and disables the dead built-in
+`WebSearch`; the model calls `web_search` and gets grounded answers with source URLs. Model
+traffic stays on the token plan — only search hits the pay-as-you-go balance. Without the key,
+`claudex` still works for everything else.
+
 Set a VNC password and start the desktop:
 
 ```bash
