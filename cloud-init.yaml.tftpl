@@ -64,6 +64,10 @@ runcmd:
   # Claude Code
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npm install -g @anthropic-ai/claude-code get-shit-done-cc'
 
+  # gws (Google Workspace CLI) — backs the /brain skill's Gmail/Calendar/Tasks
+  # commands. Pinned; auth is a manual post-deploy step (see README / the skill).
+  - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && npm install -g @googleworkspace/cli@0.22.5'
+
   # claudex — launch Claude Code routed to Xiaomi MiMo (token plan)
   # Same binary as `claude`, but overrides the endpoint + per-tier models inline.
   # Token comes from MIMO_API_KEY or ~/.claude/mimo_token (you add it post-deploy).
@@ -92,6 +96,10 @@ runcmd:
 
     export ANTHROPIC_BASE_URL="https://token-plan-sgp.xiaomimimo.com/anthropic"
     export ANTHROPIC_AUTH_TOKEN="$token"
+    # Default model: the user's configured default may be an alias MiMo can't serve
+    # (e.g. fable -> 400 Param Incorrect). Pin the session default; an explicit
+    # --model opus/sonnet/haiku flag still overrides via the alias mappings below.
+    export ANTHROPIC_MODEL="mimo-v2.5"
     export ANTHROPIC_DEFAULT_OPUS_MODEL="mimo-v2.5-pro"
     export ANTHROPIC_DEFAULT_SONNET_MODEL="mimo-v2.5"
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="mimo-v2.5"
@@ -313,6 +321,14 @@ runcmd:
     # graphify
     - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
     When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
+
+    # claudex
+    - **claudex** (`~/.claude/skills/claudex/SKILL.md`) - en-masse parallel research via `claudex -p` on token-efficient models; prefer it for any broad scouring/docs/codebase-survey task to spare main context and quota. Gather-only — the main agent makes the decisions. Trigger: `/claudex`, or proactively for breadth tasks.
+    When the user types `/claudex`, or a task needs broad fan-out research, invoke the Skill tool with `skill: "claudex"` before doing anything else.
+
+    # brain
+    - **brain** (`~/.claude/skills/brain/SKILL.md`) - personal command center: Gmail/Calendar/Tasks via the global `gws` CLI + Telegram push (secrets: `~/.claude/telegram_bot_token`, `~/.claude/telegram_chat_id`). Trigger: `/brain`
+    When the user types `/brain`, invoke the Skill tool with `skill: "brain"` before doing anything else.
     CLAUDEMD
 
   # tmux config (mirrors local ~/.tmux.conf)
@@ -365,6 +381,247 @@ runcmd:
 
   # Skills: humanizer
   - su - ${username} -c 'git clone https://github.com/blader/humanizer.git /home/${username}/.claude/skills/humanizer'
+
+  # Skills: claudex (en-masse parallel research harness via MiMo)
+  - su - ${username} -c 'mkdir -p /home/${username}/.claude/skills/claudex'
+  - |
+    cat > /home/${username}/.claude/skills/claudex/SKILL.md << 'CLAUDEXSKILL'
+    ---
+    name: claudex
+    description: >
+      En-masse parallel research via `claudex` — Claude Code routed to
+      token-efficient MiMo models. Use for any breadth task (scouring a codebase,
+      surveying docs, reading many files/repos) where fan-out reading would burn
+      the main context or Anthropic quota: shell out headless (`claudex -p "..."`)
+      and let it spawn many subagents on the cheap plan. Gather-only — claudex
+      collects and reports; the main agent makes all decisions and does all
+      editing. Trigger: /claudex, or proactively for broad scouring tasks.
+    compatibility: claude-code
+    allowed-tools:
+      - Bash
+      - Read
+    ---
+
+    # claudex — en-masse parallel research harness
+
+    `/usr/local/bin/claudex` is Claude Code with the API rerouted to Xiaomi MiMo's
+    token plan (`opus` → `mimo-v2.5-pro`, `sonnet`/`haiku` → `mimo-v2.5`). Tokens
+    it burns come off the MiMo plan, **not** the main Anthropic quota — that is the
+    entire point. Treat it as a disposable search harness: cheap context, cheap
+    subagents, cheap re-runs.
+
+    ## The contract
+
+    - **Gather-only.** claudex researches and reports. It does NOT make decisions,
+      weigh trade-offs, or edit files. The main agent reads its report and decides.
+    - **Prefer it for breadth.** Any task shaped like "read a lot, return a
+      little" — mapping a codebase, surveying docs, finding every call site,
+      summarizing many files — goes to claudex instead of reading in main context.
+    - **Keep depth here.** Single-file lookups you can answer in one Read/Grep are
+      faster done directly.
+
+    ## Preflight
+
+    - Token: `MIMO_API_KEY` env var, else `~/.claude/mimo_token`. The wrapper
+      errors clearly if neither exists.
+    - Web search: MiMo has no server-side WebSearch. The wrapper auto-loads
+      `~/.claude/search_mcp.json` as an MCP search tool and disables the dead
+      built-in — web research works, no extra flags needed.
+
+    ## Headless cookbook
+
+    **Basic one-shot** (prints the answer and exits):
+    ```bash
+    claudex -p "Map every place this repo touches the Telegram API. Return file:line + one-line role for each."
+    ```
+
+    **Read-only research run** — headless mode can't prompt for permissions, so
+    allowlist the read tools it needs; anything else silently fails:
+    ```bash
+    claudex -p "Survey how error handling works across src/. Report patterns with file:line evidence." \
+      --allowedTools "Read Glob Grep WebFetch Bash(rg:*) Bash(fd:*) Bash(ls:*) Bash(git log:*) Bash(git show:*) Bash(git diff:*)"
+    ```
+    Belt-and-braces if the task tempts it to fix things:
+    `--disallowedTools "Edit Write NotebookEdit"`.
+
+    **GOTCHA — prompt position.** `--allowedTools` and `--disallowedTools` are
+    *variadic*: they greedily consume every following bare argument as a tool
+    rule. A prompt placed after them is eaten word-by-word ("Permission deny rule
+    "Scan" matches no known tool" × every word, exit 1, empty output). Always put
+    the prompt **immediately after `-p`**, all flags after the prompt.
+
+    **Fan-out inside one claudex** — tell it explicitly to parallelize; subagent
+    spawning needs no permission grants:
+    ```bash
+    claudex -p "Spawn one Explore subagent per top-level directory in this repo, in parallel.
+    Each maps its directory's purpose, key files, and external dependencies.
+    Synthesize into a single markdown report."
+    ```
+
+    **Fan-out of claudex processes** — for independent research questions, launch
+    several in the background, each writing to the scratchpad, then read the files:
+    ```bash
+    d="$SCRATCHPAD"   # session scratchpad dir
+    claudex -p "Research question A..." --no-session-persistence > "$d/a.md" 2>"$d/a.err" &
+    claudex -p "Research question B..." --no-session-persistence > "$d/b.md" 2>"$d/b.err" &
+    wait
+    ```
+    From inside Claude Code, prefer one Bash call per claudex with
+    `run_in_background: true` over `&`/`wait` — you get notified as each finishes.
+    Long runs: raise the Bash `timeout` (max 600000 ms) or background them.
+
+    **Structured output** for parsing instead of prose:
+    ```bash
+    claudex -p --output-format json "..." | jq -r .result      # answer text
+    claudex -p --output-format json "..." | jq .total_cost_usd  # spend check
+    ```
+    Or force a shape: `--json-schema '{"type":"object",...}'`.
+
+    **Pipe context in** rather than describing it:
+    ```bash
+    git diff main... | claudex -p "Summarize what this change does, file by file."
+    ```
+
+    **Model choice**: default (sonnet → `mimo-v2.5`) is right for scouring.
+    `--model opus` (→ `mimo-v2.5-pro`) only for the final synthesis-heavy pass
+    over lots of gathered material.
+
+    **Follow-ups** reuse the previous run's context instead of re-reading:
+    ```bash
+    claudex -p -c "Now list only the call sites that lack a timeout."
+    ```
+    (Continues the most recent conversation in the cwd — don't combine with
+    `--no-session-persistence` on the first run if you'll want this.)
+
+    **Scope**: claudex sees the directory it's launched from. `cd` to the target
+    repo root first; add extra roots with `--add-dir /path/other-repo`.
+
+    ## Prompting claudex well
+
+    Every prompt should state, in one block: the question, where to look, how to
+    parallelize ("spawn N subagents, one per X"), and the **output contract** —
+    structured markdown or JSON with `file:line` references so the main agent can
+    spot-verify claims cheaply without re-reading. claudex output is a lead
+    sheet, not ground truth: verify load-bearing claims before acting on them.
+    CLAUDEXSKILL
+  - chown -R ${username}:${username} /home/${username}/.claude/skills/claudex
+
+  # Skills: brain (personal command center — Gmail/Calendar/Tasks via gws + Telegram)
+  # Needs manual post-deploy setup: Google OAuth client + `gws auth login`, and a
+  # BotFather token at ~/.claude/telegram_bot_token (+ chat id). See README.
+  - su - ${username} -c 'mkdir -p /home/${username}/.claude/skills/brain'
+  - |
+    cat > /home/${username}/.claude/skills/brain/SKILL.md << 'BRAINSKILL'
+    ---
+    name: brain
+    description: >
+      Personal command center: Gmail, Google Calendar, and Google Tasks via the
+      global `gws` CLI, plus Telegram push/receive via a BotFather bot. Use ONLY
+      when the user explicitly invokes /brain — do not activate on incidental
+      mentions of email, calendar, or tasks.
+    compatibility: claude-code
+    allowed-tools:
+      - Bash
+      - Read
+      - AskUserQuestion
+    ---
+
+    # brain — personal command center
+
+    Gmail / Calendar / Tasks through the `gws` CLI (global npm install, own token
+    store — works from any directory) and a Telegram bot for push + commands.
+    Full setup/bootstrap history lives in `~/brain/SETUP.md`; this skill is the
+    operating manual.
+
+    ## Secrets & preflight
+
+    - **Google**: nothing to load. `gws` reads its own encrypted store at
+      `~/.config/gws/` (independent of `gcloud`/ADC).
+    - **Telegram**: env var first, else plaintext file, then trim — same pattern
+      as `~/.claude/mimo_paygo_token`:
+      ```bash
+      TELEGRAM_BOT_TOKEN="$${TELEGRAM_BOT_TOKEN:-$(cat ~/.claude/telegram_bot_token)}"
+      TELEGRAM_CHAT_ID="$${TELEGRAM_CHAT_ID:-$(cat ~/.claude/telegram_chat_id)}"
+      ```
+    - **Health check** (run first if anything Google-side misbehaves):
+      ```bash
+      gws auth status   # want: has_refresh_token: true, project_id: <your-gcp-project-id>
+      ```
+
+    ## Command cookbook (verified syntax)
+
+    `+`-prefixed commands are convenience helpers; the rest are generated from
+    Google's Discovery API.
+
+    **Gmail**
+    ```bash
+    gws gmail users messages list --params '{"userId":"me"}'
+    gws gmail +send  --to alice@example.com --subject "Hi" --body "..."
+    gws gmail +reply --message-id <ID> --body "Thanks!"
+    ```
+
+    **Calendar**
+    ```bash
+    gws calendar events list --params '{"calendarId":"primary"}'
+    gws calendar +agenda --today --timezone <Your/TZ>
+    gws calendar +insert <event params>
+    ```
+
+    **Tasks** — resource is repeated: `gws tasks <resource> <verb>`.
+    `@default` resolves to the primary "My Tasks" list; other lists use the `id`
+    from `tasklists list`.
+    ```bash
+    gws tasks tasklists list
+    gws tasks tasks list --params '{"tasklist":"@default"}'
+    gws tasks tasks insert --params '{"tasklist":"@default"}' --body '{"title":"..."}'
+    ```
+
+    **Telegram** (isolated side-channel: can message you and receive commands sent
+    to it, but cannot read existing DMs/groups)
+    ```bash
+    # send (push a message to the user)
+    curl -s -X POST "https://api.telegram.org/bot$${TELEGRAM_BOT_TOKEN}/sendMessage" \
+      -H 'Content-Type: application/json' \
+      -d "{\"chat_id\":\"$${TELEGRAM_CHAT_ID}\",\"text\":\"...\"}"
+
+    # receive (poll for messages the user sent the bot)
+    curl -s "https://api.telegram.org/bot$${TELEGRAM_BOT_TOKEN}/getUpdates"
+    ```
+
+    ## Safety rules
+
+    - **Reads are free**: `list`, `get`, `+agenda`, `auth status`, Telegram
+      `getUpdates`. Run these without asking.
+    - **Writes are gated**: anything that sends, creates, updates, or deletes —
+      `+send`, `+reply`, `+insert`, `tasks ... insert`, `events ... delete/patch`,
+      Telegram `sendMessage` — requires an explicit user confirm (AskUserQuestion,
+      showing exactly what will be sent/changed) before running.
+
+    ## Auth recovery (recurs ~weekly)
+
+    The OAuth consent screen is deliberately kept in **Testing** mode, so refresh
+    tokens expire after ~7 days. When `gws` starts failing auth:
+
+    ```bash
+    gws auth login --services gmail,calendar,tasks
+    ```
+
+    - **Remote/Tailscale gotcha**: the OAuth callback listener runs on
+      `localhost:<port>` on THIS box. If the browser is on another machine the
+      redirect hits the wrong host and login hangs. Fix: copy the full
+      `http://localhost:<port>/?...code=...` redirect URL from the browser and
+      `curl` it on this box (or swap `localhost` for this box's Tailscale hostname
+      in the browser URL bar).
+    - **Gmail send 403 on scope**: only `gmail.modify` is granted; it covers
+      `messages.send`, but if a send ever 403s re-run login adding `gmail.send`
+      to the services list.
+    - **Never use `gws auth setup`** — it shells out to `gcloud` and would touch
+      work-account state. Manual OAuth path only; full re-bootstrap steps are in
+      `~/brain/SETUP.md`.
+    - Telegram token leak: `@BotFather → /revoke` reissues instantly; update
+      `~/.claude/telegram_bot_token`.
+    BRAINSKILL
+  - chown -R ${username}:${username} /home/${username}/.claude/skills/brain
 
   # Plugins: add marketplace, then install
   - su - ${username} -c 'export PATH="/home/${username}/.local/share/fnm:$PATH" && eval "$(fnm env)" && claude plugin marketplace add anthropics/claude-plugins-official'

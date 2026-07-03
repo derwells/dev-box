@@ -118,6 +118,34 @@ Once the key is present, `claudex` auto-loads the bridge and disables the dead b
 traffic stays on the token plan — only search hits the pay-as-you-go balance. Without the key,
 `claudex` still works for everything else.
 
+**`/claudex` skill.** The box also ships a `claudex` skill (`~/.claude/skills/claudex/SKILL.md`)
+that teaches your main `claude` session to offload broad "read a lot, return a little" research —
+codebase surveys, docs sweeps, finding every call site — to headless `claudex -p` runs. Fan-out
+reading then burns the cheap MiMo plan instead of your main Anthropic context and quota. It's
+gather-only: `claudex` reports with `file:line` evidence, and your main agent makes the decisions
+and does the edits.
+
+#### Optional: `/brain` (personal command center)
+
+The box ships a `brain` skill (`~/.claude/skills/brain/SKILL.md`) that wires Claude Code into
+**Gmail, Calendar, and Tasks** (via the provisioned `gws` CLI) plus **Telegram** push/receive.
+The `gws` binary is installed at provision time; the accounts and secrets are a **manual,
+one-time post-deploy step** (nothing personal is baked into the image):
+
+```bash
+# Google: create a personal-account OAuth desktop client, drop it at
+#   ~/.config/gws/client_secret.json, then:
+gws auth login --services gmail,calendar,tasks
+# Telegram: create a bot via @BotFather, then:
+echo "<bot-token>" > ~/.claude/telegram_bot_token && chmod 600 ~/.claude/telegram_bot_token
+echo "<chat-id>"   > ~/.claude/telegram_chat_id  && chmod 600 ~/.claude/telegram_chat_id
+```
+
+The skill reads those secrets from disk at runtime and gates every write (send/insert/delete)
+behind an explicit confirmation. Keep the OAuth consent screen in **Testing** mode (refresh
+tokens then expire ~weekly — re-run `gws auth login`); the skill documents the recovery flow,
+including the Tailscale localhost-callback gotcha.
+
 Set a VNC password and start the desktop:
 
 ```bash
