@@ -103,6 +103,10 @@ runcmd:
     export ANTHROPIC_DEFAULT_OPUS_MODEL="mimo-v2.5-pro"
     export ANTHROPIC_DEFAULT_SONNET_MODEL="mimo-v2.5"
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="mimo-v2.5"
+    # Non-first-party ANTHROPIC_BASE_URL disables MCP tool search by default,
+    # which hides plugin skills/commands from the slash menu. Re-enable it —
+    # requires MiMo to forward tool_reference blocks (works as of mimo-v2.5).
+    export ENABLE_TOOL_SEARCH=true
 
     # MiMo doesn't implement Anthropic's server-side WebSearch. If a search MCP
     # config exists, load it for this session and disable the dead built-in
