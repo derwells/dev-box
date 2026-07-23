@@ -75,7 +75,8 @@ runcmd:
     cat > /usr/local/bin/claudex << 'CLAUDEX'
     #!/usr/bin/env bash
     # claudex — Claude Code routed to Xiaomi MiMo (token plan)
-    # Opus -> mimo-v2.5-pro   |   Sonnet/Haiku -> mimo-v2.5
+    # All tiers (Opus/Sonnet/Haiku) -> mimo-v2.5. The pro model is deliberately
+    # not mapped — fan-out runs must never escalate to it.
     set -eo pipefail
 
     # Token: MIMO_API_KEY env override, else ~/.claude/mimo_token
@@ -100,7 +101,7 @@ runcmd:
     # (e.g. fable -> 400 Param Incorrect). Pin the session default; an explicit
     # --model opus/sonnet/haiku flag still overrides via the alias mappings below.
     export ANTHROPIC_MODEL="mimo-v2.5"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="mimo-v2.5-pro"
+    export ANTHROPIC_DEFAULT_OPUS_MODEL="mimo-v2.5"
     export ANTHROPIC_DEFAULT_SONNET_MODEL="mimo-v2.5"
     export ANTHROPIC_DEFAULT_HAIKU_MODEL="mimo-v2.5"
     # Non-first-party ANTHROPIC_BASE_URL disables MCP tool search by default,
@@ -583,7 +584,7 @@ runcmd:
     # claudex — en-masse parallel research harness
 
     `/usr/local/bin/claudex` is Claude Code with the API rerouted to Xiaomi MiMo's
-    token plan (`opus` → `mimo-v2.5-pro`, `sonnet`/`haiku` → `mimo-v2.5`). Tokens
+    token plan (all tiers — `opus`/`sonnet`/`haiku` — map to `mimo-v2.5`). Tokens
     it burns come off the MiMo plan, **not** the main Anthropic quota — that is the
     entire point. Treat it as a disposable search harness: cheap context, cheap
     subagents, cheap re-runs.
@@ -660,9 +661,10 @@ runcmd:
     git diff main... | claudex -p "Summarize what this change does, file by file."
     ```
 
-    **Model choice**: default (sonnet → `mimo-v2.5`) is right for scouring.
-    `--model opus` (→ `mimo-v2.5-pro`) only for the final synthesis-heavy pass
-    over lots of gathered material.
+    **Model choice**: everything runs on `mimo-v2.5` — all tiers map to it, so
+    there is no point passing `--model`. Do NOT try to reach `mimo-v2.5-pro`;
+    it is intentionally unmapped. If a synthesis pass needs a stronger model,
+    the main agent does it on the Anthropic side.
 
     **Follow-ups** reuse the previous run's context instead of re-reading:
     ```bash

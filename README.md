@@ -84,7 +84,8 @@ claude login                  # Claude Code — AI assistant (Anthropic)
 #### Optional: `claudex` (Claude Code routed to Xiaomi MiMo)
 
 `claudex` runs the same Claude Code binary against Xiaomi MiMo's token-plan endpoint, with this
-tier mapping: Opus → `mimo-v2.5-pro`, Sonnet/Haiku → `mimo-v2.5`. Plain `claude` is unaffected.
+tier mapping: all tiers (Opus/Sonnet/Haiku) → `mimo-v2.5`. The pricier `mimo-v2.5-pro` is
+deliberately unmapped so fan-out runs can't escalate to it. Plain `claude` is unaffected.
 
 Add your token-plan key once (looks like `tp-...`):
 
@@ -95,9 +96,8 @@ echo "tp-xxxxx" > ~/.claude/mimo_token && chmod 600 ~/.claude/mimo_token
 Then:
 
 ```bash
-claudex                       # interactive, Sonnet tier -> mimo-v2.5
-claudex --model opus          # -> mimo-v2.5-pro
-claudex -p "..."              # headless
+claudex                       # interactive -> mimo-v2.5
+claudex -p "..."              # headless (fan-out runs also stay on mimo-v2.5)
 ```
 
 A `MIMO_API_KEY` in the environment overrides the file.
