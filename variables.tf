@@ -35,6 +35,18 @@ variable "tailscale_auth_key" {
   default     = ""
 }
 
+variable "git_user_name" {
+  description = "git user.name configured on the server"
+  type        = string
+  default     = "derwells"
+}
+
+variable "git_user_email" {
+  description = "git user.email configured on the server"
+  type        = string
+  default     = "drckwells@gmail.com"
+}
+
 variable "github_token" {
   description = "GitHub PAT (fine-grained, repo-scoped, with expiry) for headless `gh` auth so private repos can be cloned. Leave empty to run `gh auth login` manually after deploy."
   type        = string

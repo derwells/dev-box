@@ -53,17 +53,19 @@ resource "hcloud_firewall" "dev_box" {
 }
 
 resource "hcloud_server" "dev_box" {
-  name        = "dev-box"
-  server_type = var.server_type
-  image       = "ubuntu-24.04"
-  location    = var.location
-  ssh_keys    = [hcloud_ssh_key.main.id]
+  name         = "dev-box"
+  server_type  = var.server_type
+  image        = "ubuntu-24.04"
+  location     = var.location
+  ssh_keys     = [hcloud_ssh_key.main.id]
   firewall_ids = [hcloud_firewall.dev_box.id]
 
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    username       = var.username
+    username           = var.username
     tailscale_auth_key = var.tailscale_auth_key
     github_token       = var.github_token
+    git_user_name      = var.git_user_name
+    git_user_email     = var.git_user_email
   })
 
   public_net {

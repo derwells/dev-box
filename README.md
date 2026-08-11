@@ -15,6 +15,11 @@ Ubuntu Server 24.04
 │   ├── Superpowers    — plugin (official marketplace)
 │   ├── Context7       — plugin (official marketplace)
 │   └── Humanizer      — writing skill
+├── zsh + oh-my-zsh    — default login shell, mirrors the local WSL config
+│   ├── Starship       — prompt (Catppuccin Latte)
+│   ├── fzf/zoxide/bat — Ctrl+R, `z`, syntax-highlighted `cat`
+│   ├── uv, pnpm, fnm  — Python + Node toolchains
+│   └── tmux           — auto-attaches to session "main" on login
 ├── GitHub CLI         — gh auth, PRs, issues
 ├── Playwright         — headless browser for automated screenshots
 ├── XFCE4             — lightweight desktop (~200MB)
@@ -102,6 +107,19 @@ claudex -p "..."              # headless (fan-out runs also stay on mimo-v2.5)
 
 A `MIMO_API_KEY` in the environment overrides the file.
 
+**Token plan ran out?** `claudex` can fall back to MiMo's pay-as-you-go API
+(`https://api.xiaomimimo.com/anthropic`), billed from account balance. It reuses the same
+`sk-...` key as the search bridge below (`MIMO_PAYGO_KEY` env or `~/.claude/mimo_paygo_token`):
+
+```bash
+claudex --paygo -p "..."                    # one run on PAYG
+echo paygo > ~/.claude/claudex_backend      # every run on PAYG until you switch back
+echo plan  > ~/.claude/claudex_backend      # back to the token plan (or just delete the file)
+```
+
+`CLAUDEX_BACKEND=paygo|plan` in the environment also works (flag > env > file). If there's no
+token-plan token at all but a PAYG key exists, `claudex` falls back to PAYG automatically.
+
 **Web search (optional, pay-as-you-go).** Claude Code's built-in `WebSearch` is server-side and
 Anthropic-only, so it doesn't work through MiMo. `claudex` instead routes search through a small
 MCP bridge (`~/.claude/mimo-search-mcp.mjs`, wired via `~/.claude/search_mcp.json`) that calls
@@ -170,6 +188,25 @@ Host dev-box
 | Laptop | `http://<tailscale-ip>:6080` in browser | Visual verification, browsing |
 | Phone  | SSH app via Tailscale                   | Quick checks, monitoring      |
 | Phone  | `http://<tailscale-ip>:6080` in browser | Visual verification           |
+
+## Shell environment
+
+The box provisions the same interactive setup as the local WSL machine, so `ssh dev-box` lands you
+in a familiar shell:
+
+- **zsh** is the login shell, with oh-my-zsh (`git` plugin) and a **Starship** prompt using the
+  Catppuccin Latte palette (`~/.config/starship.toml`).
+- **tmux** auto-attaches to a session named `main` (creating it if needed) on every interactive
+  login, so disconnects never lose work. Config is `~/.tmux.conf` — mouse on, 1-indexed windows,
+  `|`/`-` splits, and the Claude Code attention icons (🔔 needs input, ✅ finished) in the status
+  bar. Non-interactive shells (`ssh dev-box <cmd>`, provisioning) skip the attach.
+- **fzf** (Ctrl+R history, Ctrl+T files, Alt+C cd), **zoxide** (`z`), **bat** (aliased to `cat`),
+  **delta** as the git pager, plus **uv**, **pnpm**, and **fnm** on `PATH`.
+- Git identity comes from the `git_user_name` / `git_user_email` variables (defaults in
+  `variables.tf`; override in `terraform.tfvars`).
+
+WSL-only pieces of the local config — the adb/`WSL_HOST_IP` bridge, Edge as `$BROWSER`, deno,
+opencode, flyctl — are deliberately left out.
 
 ## Server Management
 
