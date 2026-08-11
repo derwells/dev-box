@@ -123,6 +123,7 @@ runcmd:
           echo "claudex: pay-as-you-go selected but no key. Set MIMO_PAYGO_KEY or write your sk-... key to ~/.claude/mimo_paygo_token" >&2
           exit 1
         fi
+        echo "claudex: using pay-as-you-go backend (a 402 here means no PAYG balance — switch back with: rm ~/.claude/claudex_backend)" >&2
         export ANTHROPIC_BASE_URL="https://api.xiaomimimo.com/anthropic"
         export ANTHROPIC_AUTH_TOKEN="$paygo_key"
         ;;
@@ -131,6 +132,7 @@ runcmd:
           echo "claudex: no MiMo token. Set MIMO_API_KEY or write your tp-... token to ~/.claude/mimo_token (or use --paygo with a PAYG key)" >&2
           exit 1
         fi
+        echo "claudex: using token-plan backend" >&2
         export ANTHROPIC_BASE_URL="https://token-plan-sgp.xiaomimimo.com/anthropic"
         export ANTHROPIC_AUTH_TOKEN="$plan_token"
         ;;
