@@ -20,6 +20,7 @@ Remote development server provisioned with OpenTofu on Hetzner Cloud. One comman
 - `setup.sh` — everything else: Node/fnm, Claude Code + GSD + plugins, claudex, gws/gwsa, skills, shell env, Playwright, VNC. Idempotent-ish; re-runnable by hand as root if an apply fails partway
 - `files/` — verbatim payload uploaded to `/root/provision` (no secrets): `bin/claudex`, `claude/` (global CLAUDE.md, statusline, search bridge, settings patch, `skills/claudex` + `skills/brain`), `gws-accounts/` (gwsa tool + per-slot email/scopes manifests), `home/` (zshrc, zshenv, tmux.conf, starship.toml)
 - `terraform.tfvars` — secrets (gitignored)
+- `files/agent-attention/` — local Claude/Codex lifecycle observer, F12 panel, tmux include, user systemd unit, and tests. `setup.sh` installs it; no session data, credentials, or Telegram sending. See its README for state semantics and regression tests.
 - `terraform.tfvars.example` — template for secrets
 
 ## Commands

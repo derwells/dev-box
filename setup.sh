@@ -70,6 +70,26 @@ run_node "node /tmp/claude-settings-patch.js"
 rm -f /tmp/claude-settings-patch.js
 
 echo "=== Shell environment (tmux, zsh, starship) ==="
+echo "=== Shared Claude/Codex attention panel ==="
+ATTENTION_DIR="$H/.local/share/agent-attention"
+mkdir -p "$ATTENTION_DIR" "$H/.local/bin" "$H/.config/systemd/user" "$H/.claude/hooks"
+install -m 0755 "$PAYLOAD/agent-attention/attention.py" "$ATTENTION_DIR/attention.py"
+for name in tmux.conf README.md test_attention.py test_panel_ui.py agent-attention.service; do
+  install -m 0644 "$PAYLOAD/agent-attention/$name" "$ATTENTION_DIR/$name"
+done
+ln -sfn "$ATTENTION_DIR/attention.py" "$H/.local/bin/agent-attention"
+install -m 0644 "$PAYLOAD/agent-attention/agent-attention.service" "$H/.config/systemd/user/agent-attention.service"
+install -m 0755 "$PAYLOAD/claude/hooks/tmux-attention.sh" "$H/.claude/hooks/tmux-attention.sh"
+# Enable on the user's next login, even when their systemd manager is not
+# running during first-boot provisioning. Start/restart it on an existing box.
+mkdir -p "$H/.config/systemd/user/default.target.wants"
+ln -sfn ../agent-attention.service "$H/.config/systemd/user/default.target.wants/agent-attention.service"
+chown -R "$USERNAME:$USERNAME" "$ATTENTION_DIR" "$H/.local/bin" "$H/.config/systemd" "$H/.claude/hooks"
+ATTENTION_UID=$(id -u "$USERNAME")
+if [ -S "/run/user/$ATTENTION_UID/bus" ]; then
+  run_user "XDG_RUNTIME_DIR=/run/user/$ATTENTION_UID systemctl --user daemon-reload"
+  run_user "XDG_RUNTIME_DIR=/run/user/$ATTENTION_UID systemctl --user restart agent-attention.service"
+fi
 install -m 0644 "$PAYLOAD/home/tmux.conf" "$H/.tmux.conf"
 install -m 0644 "$PAYLOAD/home/zshenv" "$H/.zshenv"
 install -m 0644 "$PAYLOAD/home/zshrc" "$H/.zshrc"

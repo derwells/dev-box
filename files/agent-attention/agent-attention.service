@@ -1,0 +1,13 @@
+[Unit]
+Description=Local Claude and Codex attention panel for tmux
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/share/agent-attention/attention.py watch
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

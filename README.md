@@ -233,8 +233,13 @@ in a familiar shell:
   Catppuccin Latte palette (`~/.config/starship.toml`).
 - **tmux** auto-attaches to a session named `main` (creating it if needed) on every interactive
   login, so disconnects never lose work. Config is `~/.tmux.conf` — mouse on, 1-indexed windows,
-  `|`/`-` splits, the Claude Code attention icons (🔔 needs input, ✅ finished) in the status
-  bar, plus mobile-friendly touches: a two-line status bar with tap-sized window targets, F1–F12
+  `|`/`-` splits, and a shared **Claude Code + Codex attention panel** on F12. Green means
+  ready, amber needs input, blue working; completion waits for tracked sub-agents and active
+  Codex goals. Tap either line to open its exact pane and mark the alert read; READY stays
+  visible. Alt+a jumps to the next unread alert and Alt+d marks the current pane read.
+  The panel uses a local user service, with no Telegram sending. See
+  [setup details and tests](files/agent-attention/README.md).
+  Mobile-friendly touches include a two-line status bar with tap-sized window targets, F1–F11
   and Alt+digit window switching, swipe-to-cycle on the status bar, and OSC 52 clipboard
   forwarding. Non-interactive shells (`ssh dev-box <cmd>`, provisioning) skip the attach.
 - **fzf** (Ctrl+R history, Ctrl+T files, Alt+C cd), **zoxide** (`z`), **bat** (aliased to `cat`),

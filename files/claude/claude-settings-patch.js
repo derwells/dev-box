@@ -14,14 +14,19 @@ Object.assign(settings, {
     command: "bash " + process.env.HOME + "/.claude/statusline-command.sh"
   }
 });
-// Claude Code attention icons: set a tmux window var that ~/.tmux.conf
-// renders (🔔 = needs input, ✅ = finished). Merge into hooks without
-// clobbering GSD's own hooks (SessionStart/PreToolUse/PostToolUse).
+// Route attention events to the local Claude/Codex panel. Completion is
+// checked against root + subagent lifecycle state; no Telegram is sent.
+// Replace our old @ci hooks while retaining unrelated Notification/Stop hooks.
 settings.hooks = settings.hooks || {};
-settings.hooks.Notification = [
-  { hooks: [{ type: "command", command: "[ -n \"$TMUX_PANE\" ] && tmux set -w -t \"$TMUX_PANE\" @ci '🔔 ' || true" }] }
-];
-settings.hooks.Stop = [
-  { hooks: [{ type: "command", command: "[ -n \"$TMUX_PANE\" ] && tmux set -w -t \"$TMUX_PANE\" @ci '✅ ' || true" }] }
-];
+for (const [event, action] of [['Notification', 'notify'], ['Stop', 'stop']]) {
+  const groups = (settings.hooks[event] || []).map(group => ({
+    ...group,
+    hooks: (group.hooks || []).filter(hook =>
+      !/tmux-attention\.sh|tmux set.*@ci/.test(hook.command || ''))
+  })).filter(group => group.hooks.length);
+  groups.push({ hooks: [{ type: 'command',
+    command: 'bash "$HOME/.claude/hooks/tmux-attention.sh" ' + action,
+    timeout: 5 }] });
+  settings.hooks[event] = groups;
+}
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
