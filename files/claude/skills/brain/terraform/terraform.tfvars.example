@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars only if you want to override the default. tfvars is gitignored.
+# project_id already defaults to "brain-500508" in main.tf, so this is usually unnecessary.
+
+# project_id = "brain-500508"

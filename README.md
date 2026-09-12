@@ -15,6 +15,7 @@ Ubuntu Server 24.04
 │   ├── Superpowers    — plugin (official marketplace)
 │   ├── Context7       — plugin (official marketplace)
 │   └── Humanizer      — writing skill
+├── gws + gwsa         — Google Workspace CLI, one credential slot per account
 ├── zsh + oh-my-zsh    — default login shell, mirrors the local WSL config
 │   ├── Starship       — prompt (Catppuccin Latte)
 │   ├── fzf/zoxide/bat — Ctrl+R, `z`, syntax-highlighted `cat`
@@ -61,7 +62,17 @@ tofu init
 tofu apply
 ```
 
-This creates the server and runs cloud-init, which installs everything. Takes ~5 minutes.
+This creates the server in two stages: cloud-init bootstraps it (user, packages, Tailscale,
+firewall), then OpenTofu uploads `files/` + `setup.sh` over SSH and runs the script to install
+everything else. The split exists because Hetzner hard-caps cloud-init `user_data` at 32KiB and
+the full payload is far larger. Takes ~10 minutes. The provisioners connect as root with
+`ssh_private_key_path` (default `~/.ssh/id_ed25519`).
+
+If `setup.sh` fails partway (e.g. a flaky download), it's safe to re-run by hand:
+
+```bash
+ssh root@<public-ip> 'bash /root/setup.sh <username> "<git name>" <git email>'
+```
 
 ### 4. Post-deploy (one-time)
 
@@ -89,8 +100,9 @@ claude login                  # Claude Code — AI assistant (Anthropic)
 #### Optional: `claudex` (Claude Code routed to Xiaomi MiMo)
 
 `claudex` runs the same Claude Code binary against Xiaomi MiMo's token-plan endpoint, with this
-tier mapping: all tiers (Opus/Sonnet/Haiku) → `mimo-v2.5`. The pricier `mimo-v2.5-pro` is
-deliberately unmapped so fan-out runs can't escalate to it. Plain `claude` is unaffected.
+tier mapping: Sonnet/Haiku (and the session default) → `mimo-v2.5` for cheap fan-out;
+`--model opus` / `--model fable` → `mimo-v2.5-pro` for runs that explicitly ask for the high
+tier. Plain `claude` is unaffected.
 
 Add your token-plan key once (looks like `tp-...`):
 
@@ -147,22 +159,45 @@ and does the edits.
 
 The box ships a `brain` skill (`~/.claude/skills/brain/SKILL.md`) that wires Claude Code into
 **Gmail, Calendar, and Tasks** (via the provisioned `gws` CLI) plus **Telegram** push/receive.
-The `gws` binary is installed at provision time; the accounts and secrets are a **manual,
-one-time post-deploy step** (nothing personal is baked into the image):
+The `gws` binary is installed at provision time; credentials are a **manual, one-time
+post-deploy step** (no secrets are baked into the image):
 
 ```bash
-# Google: create a personal-account OAuth desktop client, drop it at
-#   ~/.config/gws/client_secret.json, then:
-gws auth login --services gmail,calendar,tasks
+# Google — per account slot: drop the shared OAuth desktop client JSON into the
+# slot dir, then log in (opens a consent URL; gwsa verifies you picked the right
+# account and the scopes from the slot's scopes file):
+cp client_secret.json ~/.config/gws-accounts/<slot>/client_secret.json
+gwsa login <slot>
 # Telegram: create a bot via @BotFather, then:
 echo "<bot-token>" > ~/.claude/telegram_bot_token && chmod 600 ~/.claude/telegram_bot_token
 echo "<chat-id>"   > ~/.claude/telegram_chat_id  && chmod 600 ~/.claude/telegram_chat_id
 ```
 
-The skill reads those secrets from disk at runtime and gates every write (send/insert/delete)
+**Multi-account (`gwsa`).** Provisioning lays down one isolated `gws` credential store
+("slot") per Google account under `~/.config/gws-accounts/<slot>/` — `personal` (default),
+`angkin`, `pymc`, `ce` — each with an `email` manifest and a `scopes` file. The `gwsa`
+wrapper (on `PATH`, symlinked from that dir) is the only interface you need:
+
+```bash
+gwsa <slot> <any gws command>   # account-scoped gws
+gwsa status --verify            # all-slot health: creds, token, right account, scope drift
+gwsa login <slot>               # (re-)auth a slot with its scopes file
+gwsa token <slot>               # fresh access token for raw REST (e.g. Admin SDK)
+gwsa check --notify             # cron target: Telegram ping when a token dies
+```
+
+Bare `gws` = the `personal` slot (`~/.config/gws` is a symlink to it). **Never** run bare
+`gws auth login` for a non-personal account — it would overwrite personal's credentials;
+always `gwsa login <slot>`. A daily cron (08:30) runs `gwsa check --notify` and pings
+Telegram when a previously-working slot needs re-login. Full docs (shared OAuth client,
+test users, the ~7-day Testing-mode token expiry and how domain-admin trust lifts it) are
+provisioned to `~/.config/gws-accounts/README.md`, and one-time GCP bootstrap history to
+`~/.claude/skills/brain/SETUP.md`.
+
+The skill reads secrets from disk at runtime and gates every write (send/insert/delete)
 behind an explicit confirmation. Keep the OAuth consent screen in **Testing** mode (refresh
-tokens then expire ~weekly — re-run `gws auth login`); the skill documents the recovery flow,
-including the Tailscale localhost-callback gotcha.
+tokens then expire ~weekly — `gwsa login <slot>` revives a slot in ~30s); the skill documents
+the recovery flow, including the Tailscale localhost-callback gotcha.
 
 Set a VNC password and start the desktop:
 
@@ -198,8 +233,10 @@ in a familiar shell:
   Catppuccin Latte palette (`~/.config/starship.toml`).
 - **tmux** auto-attaches to a session named `main` (creating it if needed) on every interactive
   login, so disconnects never lose work. Config is `~/.tmux.conf` — mouse on, 1-indexed windows,
-  `|`/`-` splits, and the Claude Code attention icons (🔔 needs input, ✅ finished) in the status
-  bar. Non-interactive shells (`ssh dev-box <cmd>`, provisioning) skip the attach.
+  `|`/`-` splits, the Claude Code attention icons (🔔 needs input, ✅ finished) in the status
+  bar, plus mobile-friendly touches: a two-line status bar with tap-sized window targets, F1–F12
+  and Alt+digit window switching, swipe-to-cycle on the status bar, and OSC 52 clipboard
+  forwarding. Non-interactive shells (`ssh dev-box <cmd>`, provisioning) skip the attach.
 - **fzf** (Ctrl+R history, Ctrl+T files, Alt+C cd), **zoxide** (`z`), **bat** (aliased to `cat`),
   **delta** as the git pager, plus **uv**, **pnpm**, and **fnm** on `PATH`.
 - Git identity comes from the `git_user_name` / `git_user_email` variables (defaults in

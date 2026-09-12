@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# claudex — Claude Code routed to Xiaomi MiMo
+# Sonnet/Haiku -> mimo-v2.5 (cheap fan-out). Opus and Fable -> mimo-v2.5-pro
+# for runs that ask for the high tier explicitly (--model opus / --model fable).
+#
+# Backend selection (first match wins):
+#   --paygo flag anywhere in the args
+#   CLAUDEX_BACKEND=paygo|plan in the environment
+#   ~/.claude/claudex_backend containing "paygo" or "plan"
+#   default: plan; auto-falls back to paygo if no plan token but a PAYG key exists
+set -eo pipefail
+
+backend="$CLAUDEX_BACKEND"
+args=()
+for a in "$@"; do
+  if [ "$a" = "--paygo" ]; then backend="paygo"; else args+=("$a"); fi
+done
+set -- "${args[@]+"${args[@]}"}"
+if [ -z "$backend" ] && [ -f "$HOME/.claude/claudex_backend" ]; then
+  backend="$(tr -d '[:space:]' < "$HOME/.claude/claudex_backend")"
+fi
+
+plan_token="$MIMO_API_KEY"
+if [ -z "$plan_token" ] && [ -f "$HOME/.claude/mimo_token" ]; then
+  plan_token="$(tr -d '[:space:]' < "$HOME/.claude/mimo_token")"
+fi
+paygo_key="$MIMO_PAYGO_KEY"
+if [ -z "$paygo_key" ] && [ -f "$HOME/.claude/mimo_paygo_token" ]; then
+  paygo_key="$(tr -d '[:space:]' < "$HOME/.claude/mimo_paygo_token")"
+fi
+
+# No explicit choice and no plan token: fall back to PAYG if we can.
+if [ -z "$backend" ] && [ -z "$plan_token" ] && [ -n "$paygo_key" ]; then
+  backend="paygo"
+  echo "claudex: no token-plan token; falling back to pay-as-you-go." >&2
+fi
+
+case "$backend" in
+  paygo)
+    if [ -z "$paygo_key" ]; then
+      echo "claudex: pay-as-you-go selected but no key. Set MIMO_PAYGO_KEY or write your sk-... key to ~/.claude/mimo_paygo_token" >&2
+      exit 1
+    fi
+    echo "claudex: using pay-as-you-go backend (a 402 here means no PAYG balance — switch back with: rm ~/.claude/claudex_backend)" >&2
+    export ANTHROPIC_BASE_URL="https://api.xiaomimimo.com/anthropic"
+    export ANTHROPIC_AUTH_TOKEN="$paygo_key"
+    ;;
+  ""|plan)
+    if [ -z "$plan_token" ]; then
+      echo "claudex: no MiMo token. Set MIMO_API_KEY or write your tp-... token to ~/.claude/mimo_token (or use --paygo with a PAYG key)" >&2
+      exit 1
+    fi
+    echo "claudex: using token-plan backend" >&2
+    export ANTHROPIC_BASE_URL="https://token-plan-sgp.xiaomimimo.com/anthropic"
+    export ANTHROPIC_AUTH_TOKEN="$plan_token"
+    ;;
+  *)
+    echo "claudex: unknown backend '$backend' (expected plan or paygo)" >&2
+    exit 1
+    ;;
+esac
+
+# Ensure the fnm-managed claude is reachable in non-interactive shells too
+if ! command -v claude >/dev/null 2>&1; then
+  export PATH="$HOME/.local/share/fnm:$PATH"
+  command -v fnm >/dev/null 2>&1 && eval "$(fnm env)"
+fi
+
+# Default model: the user's configured default may be an alias MiMo can't serve
+# (e.g. fable -> 400 Param Incorrect). Pin the session default to the cheap
+# tier; explicit --model opus/fable escalates to mimo-v2.5-pro, while
+# sonnet/haiku stay on mimo-v2.5.
+export ANTHROPIC_MODEL="mimo-v2.5"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="mimo-v2.5-pro"
+export ANTHROPIC_DEFAULT_FABLE_MODEL="mimo-v2.5-pro"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="mimo-v2.5"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="mimo-v2.5"
+# Non-first-party ANTHROPIC_BASE_URL disables MCP tool search by default,
+# which hides plugin skills/commands from the slash menu. Re-enable it —
+# requires MiMo to forward tool_reference blocks (works as of mimo-v2.5).
+export ENABLE_TOOL_SEARCH=true
+
+# MiMo doesn't implement Anthropic's server-side WebSearch. If a search MCP
+# config exists, load it for this session and disable the dead built-in
+# WebSearch so the model uses the MCP search tool instead.
+search_cfg="$HOME/.claude/search_mcp.json"
+if [ -f "$search_cfg" ]; then
+  exec claude --mcp-config "$search_cfg" --disallowedTools WebSearch "$@"
+fi
+
+exec claude "$@"

@@ -1,0 +1,7 @@
+# secrets — never commit
+*/client_secret.json
+*/credentials.enc
+*/token_cache.json
+*/.encryption_key
+*/credentials.json
+*/cache/

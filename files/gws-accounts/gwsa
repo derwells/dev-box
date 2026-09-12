@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+"""gwsa — multi-account wrapper for the gws CLI.
+
+Account slots live in ~/.config/gws-accounts/<slot>/ (scopes, email,
+client_secret.json, credentials). Full docs: ~/.config/gws-accounts/README.md
+
+Usage:
+  gwsa <slot> <gws args...>   run gws as that account   (gwsa pymc gmail users messages list ...)
+  gwsa list                   show slots and their accounts
+  gwsa status [--verify]      health of every slot (--verify: live check of email + scopes)
+  gwsa login <slot>           OAuth login with the slot's scopes file, then verify identity
+  gwsa token <slot>           print a fresh access token (for raw REST calls)
+  gwsa check [--notify]       exit 1 if any slot needs re-login (--notify: Telegram ping; used by cron)
+"""
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+ROOT = os.path.expanduser("~/.config/gws-accounts")
+VERBS = {"list", "status", "login", "token", "check", "help", "-h", "--help"}
+
+
+def find_gws():
+    # PATH first; else fall back to fnm's npm-global install (PATH in cron /
+    # bare shells lacks the fnm multishell dir)
+    found = shutil.which("gws")
+    if found:
+        return found
+    fnm = sorted(glob.glob(os.path.expanduser(
+        "~/.local/share/fnm/node-versions/*/installation/bin/gws")))
+    if fnm:
+        return fnm[-1]
+    sys.exit("gwsa: cannot find the gws binary (not on PATH, no fnm install)")
+
+
+GWS = find_gws()
+
+
+def slots():
+    return sorted(
+        d for d in os.listdir(ROOT)
+        if os.path.isdir(os.path.join(ROOT, d)) and not d.startswith(".")
+    )
+
+
+def env_for(slot):
+    env = dict(os.environ)
+    env["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"] = os.path.join(ROOT, slot)
+    # per-dir key files: slots stay self-contained, logins can't clobber
+    # another slot's key via a shared system-keyring entry
+    env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"] = "file"
+    return env
+
+
+def read_file(slot, name):
+    try:
+        with open(os.path.join(ROOT, slot, name)) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def scopes_for(slot):
+    raw = read_file(slot, "scopes") or ""
+    return [ln.strip() for ln in raw.splitlines()
+            if ln.strip() and not ln.strip().startswith("#")]
+
+
+def gws_json(slot, *args):
+    p = subprocess.run([GWS, *args], env=env_for(slot),
+                       capture_output=True, text=True)
+    m = re.search(r"\{.*\}", p.stdout, re.S)
+    return json.loads(m.group(0)) if m else {}
+
+
+def deep_find(obj, key):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if key in k.lower() and isinstance(v, str) and v:
+                return v
+            r = deep_find(v, key)
+            if r:
+                return r
+    return None
+
+
+def mint_token(slot):
+    creds = gws_json(slot, "auth", "export", "--unmasked")
+    rt = deep_find(creds, "refresh_token")
+    cid = deep_find(creds, "client_id")
+    cs = deep_find(creds, "client_secret")
+    if not (rt and cid and cs):
+        sys.exit(f"gwsa: no stored credentials for '{slot}' — run: gwsa login {slot}")
+    body = urllib.parse.urlencode({
+        "grant_type": "refresh_token", "refresh_token": rt,
+        "client_id": cid, "client_secret": cs,
+    }).encode()
+    try:
+        with urllib.request.urlopen("https://oauth2.googleapis.com/token", body) as r:
+            return json.load(r)["access_token"]
+    except urllib.error.HTTPError as e:
+        sys.exit(f"gwsa: token refresh failed for '{slot}' ({e.read().decode()[:200]})\n"
+                 f"      likely the ~7-day testing-mode expiry — run: gwsa login {slot}")
+
+
+def tokeninfo(token):
+    url = "https://oauth2.googleapis.com/tokeninfo?access_token=" + urllib.parse.quote(token)
+    with urllib.request.urlopen(url) as r:
+        return json.load(r)
+
+
+def cmd_list():
+    for s in slots():
+        print(f"{s:10s} {read_file(s, 'email') or '(no email file)'}")
+
+
+def cmd_status(verify=False):
+    print(f"{'slot':10s} {'account':28s} {'creds':6s} {'token':8s}"
+          + ("  live check" if verify else ""))
+    for s in slots():
+        st = gws_json(s, "auth", "status")
+        has = bool(st.get("has_refresh_token"))
+        valid = st.get("token_valid")
+        line = (f"{s:10s} {read_file(s, 'email') or '?':28s} "
+                f"{'yes' if has else 'NO':6s} {str(valid) if has else '-':8s}")
+        if verify and has:
+            try:
+                info = tokeninfo(mint_token(s))
+                actual = info.get("email", "?")
+                granted = set(info.get("scope", "").split())
+                missing = [sc for sc in scopes_for(s) if sc not in granted]
+                ok = actual == read_file(s, "email")
+                line += f"  {actual}{' OK' if ok else '  <-- WRONG ACCOUNT'}"
+                if missing:
+                    line += f" | missing {len(missing)} scope(s): " + ", ".join(
+                        sc.rsplit("/", 1)[-1] for sc in missing)
+            except SystemExit as e:
+                line += f"  {e}"
+        print(line)
+
+
+def cmd_login(slot):
+    expected = read_file(slot, "email")
+    scopes = scopes_for(slot)
+    print(f"Logging in slot '{slot}'"
+          + (f" — consent as {expected}" if expected else "")
+          + (f" ({len(scopes)} scopes from scopes file)" if scopes else ""))
+    print("Remote/Tailscale note: if the browser is on another machine, copy the")
+    print("localhost redirect URL it lands on and `curl` it on THIS box.\n")
+    args = [GWS, "auth", "login"]
+    if scopes:
+        args += ["--scopes", ",".join(scopes)]
+    rc = subprocess.run(args, env=env_for(slot)).returncode
+    if rc != 0:
+        sys.exit(rc)
+    # verify the identity that actually landed
+    info = tokeninfo(mint_token(slot))
+    actual = info.get("email")
+    granted = set(info.get("scope", "").split())
+    missing = [sc for sc in scopes if sc not in granted]
+    if expected and actual != expected:
+        print(f"\n*** WRONG ACCOUNT: slot '{slot}' expected {expected} but got {actual}.")
+        print(f"*** Fix now:  gwsa {slot} auth logout   then   gwsa login {slot}")
+        sys.exit(1)
+    print(f"\nOK: {actual} stored in slot '{slot}'.")
+    if missing:
+        print("Warning: consent did not grant: " + ", ".join(missing))
+
+
+def send_telegram(text):
+    def secret(name):
+        try:
+            with open(os.path.expanduser(f"~/.claude/{name}")) as f:
+                return f.read().strip()
+        except OSError:
+            return None
+    tok, chat = secret("telegram_bot_token"), secret("telegram_chat_id")
+    if not (tok and chat):
+        print("gwsa check: telegram secrets missing, cannot notify", file=sys.stderr)
+        return
+    body = json.dumps({"chat_id": chat, "text": text}).encode()
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{tok}/sendMessage", body,
+        {"Content-Type": "application/json"})
+    urllib.request.urlopen(req)
+
+
+def cmd_check(notify=False):
+    dead, missing = [], []
+    for s in slots():
+        st = gws_json(s, "auth", "status")
+        if not st.get("has_refresh_token"):
+            missing.append(s)
+            continue
+        try:
+            mint_token(s)
+        except SystemExit:
+            dead.append(s)
+    if not dead and not missing:
+        print("all slots healthy")
+        return
+    lines = [f"{s} ({read_file(s, 'email')}): token dead — run: gwsa login {s}"
+             for s in dead]
+    if missing:
+        lines.append("never logged in: " + ", ".join(missing))
+    msg = "gws account health:\n" + "\n".join(lines)
+    print(msg)
+    if notify and dead:  # only ping for slots that WERE working and died
+        send_telegram(msg)
+    sys.exit(1)
+
+
+def main():
+    argv = sys.argv[1:]
+    if not argv or argv[0] in {"help", "-h", "--help"}:
+        print(__doc__.strip())
+        return
+    cmd = argv[0]
+    if cmd == "list":
+        cmd_list()
+    elif cmd == "check":
+        cmd_check(notify="--notify" in argv)
+    elif cmd == "status":
+        cmd_status(verify="--verify" in argv)
+    elif cmd == "login":
+        if len(argv) < 2 or argv[1] not in slots():
+            sys.exit(f"usage: gwsa login <{'|'.join(slots())}>")
+        cmd_login(argv[1])
+    elif cmd == "token":
+        if len(argv) < 2 or argv[1] not in slots():
+            sys.exit(f"usage: gwsa token <{'|'.join(slots())}>")
+        print(mint_token(argv[1]))
+    elif cmd in slots():
+        os.execvpe(GWS, [GWS] + argv[1:], env_for(cmd))
+    else:
+        sys.exit(f"gwsa: unknown slot/command '{cmd}' "
+                 f"(slots: {', '.join(slots())}; commands: list, status, login, token)")
+
+
+if __name__ == "__main__":
+    main()

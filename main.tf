@@ -60,16 +60,50 @@ resource "hcloud_server" "dev_box" {
   ssh_keys     = [hcloud_ssh_key.main.id]
   firewall_ids = [hcloud_firewall.dev_box.id]
 
+  # Bootstrap only — Hetzner caps user_data at 32KiB, so the bulk of the
+  # provisioning runs via setup.sh over SSH (provisioners below).
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
     username           = var.username
+    ssh_public_key     = trimspace(file(var.ssh_public_key_path))
     tailscale_auth_key = var.tailscale_auth_key
     github_token       = var.github_token
-    git_user_name      = var.git_user_name
-    git_user_email     = var.git_user_email
   })
 
   public_net {
     ipv4_enabled = true
     ipv6_enabled = true
+  }
+
+  # Hetzner installs the SSH key for root, so provisioners connect as root
+  # even though day-to-day access is the non-root user Tailscale SSH.
+  connection {
+    type        = "ssh"
+    user        = "root"
+    private_key = file(var.ssh_private_key_path)
+    host        = self.ipv4_address
+  }
+
+  # Static provisioning payload (configs, skills, the gwsa tool — no secrets).
+  provisioner "remote-exec" {
+    inline = ["mkdir -p /root/provision"]
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/files/"
+    destination = "/root/provision"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/setup.sh"
+    destination = "/root/setup.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      # cloud-init must finish first (user, packages, tailscale, ufw).
+      # Exit 2 = "done with recoverable warnings" — acceptable.
+      "cloud-init status --wait >/dev/null || [ $? -eq 2 ]",
+      "bash /root/setup.sh '${var.username}' '${var.git_user_name}' '${var.git_user_email}'",
+    ]
   }
 }

@@ -10,6 +10,12 @@ variable "ssh_public_key_path" {
   default     = "~/.ssh/id_ed25519.pub"
 }
 
+variable "ssh_private_key_path" {
+  description = "Path to the SSH private key matching ssh_public_key_path (used by provisioners to upload files/ and run setup.sh)"
+  type        = string
+  default     = "~/.ssh/id_ed25519"
+}
+
 variable "username" {
   description = "Non-root user to create on the server"
   type        = string
