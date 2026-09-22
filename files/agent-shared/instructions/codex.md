@@ -1,0 +1,8 @@
+# Codex adapter
+- Native explicit skill syntax is `$brain`, `$learn`, `$handoff`, etc.; use `/skills` to discover skills. Treat a literal personal slash trigger received in a prompt as the equivalent skill request.
+- Load a skill by reading its complete SKILL.md when no dedicated skill tool exists. Translate legacy `Skill`, `Read`, `Bash`, `Task`/`Agent`, and `AskUserQuestion` references to the tools available in this session; do not call nonexistent Claude tools.
+- Native Codex subagents run Codex models only; for a Claude or OpenCode worker, or when Derick names one, use Paseo `create_agent`. Claude model names and Claude agent files are not Codex model configuration.
+- Use the native Codex GSD skill installation and its runtime paths for GSD workflows, not the Claude GSD skill copies.
+- GSD's generated tool examples are illustrative: use the actual session tool schema. If `spawn_agent` has `task_name` rather than `agent_type`, read the matching `~/.codex/agents/gsd-*.toml` and include its `developer_instructions` in the delegated task. Use the available wait/message tools; do not invent `wait(ids)` or `close_agent` when absent. Respect actual session restrictions on delegation and model overrides.
+- Preserve explicit-only handoff invocation. A checkpoint prompt is intended for a new conversation; do not assume Claude's `/clear` exists.
+- Read existing files before editing. When starting or resuming a GSD project, read `.planning/STATE.md` and keep it current as phases change. These are workflow instructions; do not assume Claude's context monitor, write guards or commit hook are running in Codex.

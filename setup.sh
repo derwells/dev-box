@@ -44,10 +44,9 @@ run_node "npm install -g @googleworkspace/cli@0.22.5"
 echo "=== claudex wrapper ==="
 install -m 0755 "$PAYLOAD/bin/claudex" /usr/local/bin/claudex
 
-echo "=== ~/.claude payload (search bridge, statusline, CLAUDE.md) ==="
+echo "=== ~/.claude payload (search bridge, statusline) ==="
 mkdir -p "$H/.claude"
 install -m 0644 "$PAYLOAD/claude/mimo-search-mcp.mjs" "$H/.claude/mimo-search-mcp.mjs"
-install -m 0644 "$PAYLOAD/claude/CLAUDE.md" "$H/.claude/CLAUDE.md"
 install -m 0755 "$PAYLOAD/claude/statusline-command.sh" "$H/.claude/statusline-command.sh"
 cat > "$H/.claude/search_mcp.json" << EOF
 {
@@ -60,6 +59,17 @@ cat > "$H/.claude/search_mcp.json" << EOF
 }
 EOF
 chown -R "$USERNAME:$USERNAME" "$H/.claude"
+
+echo "=== agent-shared: one instruction source rendered for Claude, Codex, OpenCode ==="
+# ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md and ~/.config/opencode/AGENTS.md are
+# generated from instructions/common.md + the per-app adapter. Edit the sources
+# and re-run sync.py; never edit the generated files.
+mkdir -p "$H/.config/agent-shared/instructions"
+install -m 0644 "$PAYLOAD"/agent-shared/instructions/*.md "$H/.config/agent-shared/instructions/"
+install -m 0755 "$PAYLOAD/agent-shared/sync.py" "$H/.config/agent-shared/sync.py"
+chown -R "$USERNAME:$USERNAME" "$H/.config/agent-shared"
+run_user "python3 $H/.config/agent-shared/sync.py --instructions-only"
+chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
 
 echo "=== GSD (registers skills + hooks into ~/.claude/) ==="
 run_node "GSD_PORTABLE_HOOKS=1 npx get-shit-done-cc@latest --claude --global"
