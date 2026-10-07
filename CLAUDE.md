@@ -22,6 +22,7 @@ Remote development server provisioned with OpenTofu on Hetzner Cloud. One comman
 - `terraform.tfvars` — secrets (gitignored)
 - `files/agent-attention/` — local Claude/Codex lifecycle observer, F12 panel, tmux include, user systemd unit, and tests. `setup.sh` installs it; no session data, credentials, or Telegram sending. See its README for state semantics and regression tests.
 - `files/devbox-guard/` — contention guard: systemd drop-ins giving `ssh`/`tailscaled` high CPU/IO weight and `MemoryMin` (plus `system.slice` `MemoryMin` so that protection is effective), sshd `Nice=-5` reset to 0 for login sessions via `limits.conf`, `io` delegated to user managers, and `devbox-iocost.service` enabling blk-iocost so `IOWeight` is enforced. The tmux server starts in the user `fleet.slice` (zshrc / hq `fleet.py up`), so every pane inherits its low weight.
+- `data-volume.sh` — mounts the Hetzner data volume (`hcloud_volume.data`, 200 GB) at `/mnt/data` (`nofail`) and moves bulky, rebuildable data onto it: `~/.cache` and `~/.npm` become symlinks (uv's hard-linked cache stays on root as `~/.uv-cache`), and `/var/lib/docker` + `/var/lib/containerd` become bind mounts. `--dry-run` prints the steps. Never move `~/dev` or the fleet worktree trash (`git worktree move` can't cross filesystems).
 - `terraform.tfvars.example` — template for secrets
 
 ## Commands
