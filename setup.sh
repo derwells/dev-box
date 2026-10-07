@@ -237,6 +237,22 @@ WantedBy=multi-user.target
 NOVNCUNIT
 
 systemctl daemon-reload
+
+# devbox-guard: keep sshd and tailscaled responsive when agents saturate the
+# box (2026-10-06 stall). High CPU/IO weight + MemoryMin for both, Nice for
+# sshd (reset to 0 in login sessions by limits.conf), io delegated to user
+# managers so fleet.slice's IOWeight applies, and blk-iocost so IOWeight is
+# enforced at all. fleet.slice itself is installed by hq's `fleet.py up`.
+G="$PAYLOAD/devbox-guard"
+for u in ssh.service tailscaled.service system.slice user@.service; do
+  install -D -m 0644 "$G/$u.conf" "/etc/systemd/system/$u.d/90-devbox-guard.conf"
+done
+install -m 0644 "$G/limits.conf" /etc/security/limits.d/90-devbox-guard.conf
+install -m 0755 "$G/iocost.sh" /usr/local/sbin/devbox-iocost
+install -m 0644 "$G/devbox-iocost.service" /etc/systemd/system/devbox-iocost.service
+systemctl daemon-reload
+systemctl enable --now devbox-iocost.service
+
 # VNC requires a password — run `vncpasswd` before enabling, then:
 #   sudo systemctl enable --now vncserver@1 novnc
 
