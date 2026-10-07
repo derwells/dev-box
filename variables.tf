@@ -59,3 +59,9 @@ variable "github_token" {
   sensitive   = true
   default     = ""
 }
+
+variable "data_volume_size" {
+  description = "Size in GB of the /mnt/data volume (grow-only; resize2fs after growing)"
+  type        = number
+  default     = 200
+}

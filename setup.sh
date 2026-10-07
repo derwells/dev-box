@@ -25,7 +25,7 @@ PAYLOAD="/root/provision"
 # Run a command as the user with fnm's node on PATH (non-interactive shells
 # don't source .zshrc/.bashrc, so the PATH must be set explicitly).
 run_node() {
-  su - "$USERNAME" -c "export PATH=\"$H/.local/share/fnm:\$PATH\" && eval \"\$(fnm env)\" && $*"
+  su - "$USERNAME" -c "export PATH=\"$H/.local/bin:$H/.local/share/fnm:\$PATH\" && eval \"\$(fnm env)\" && $*"
 }
 run_user() {
   su - "$USERNAME" -c "$*"
@@ -35,8 +35,12 @@ echo "=== Node.js via fnm ==="
 run_user "curl -fsSL https://fnm.vercel.app/install | bash"
 run_node "fnm install --lts && fnm use --lts"
 
-echo "=== Claude Code + GSD + gws ==="
-run_node "npm install -g @anthropic-ai/claude-code get-shit-done-cc"
+echo "=== Claude Code + gws ==="
+# Native installer: binary in ~/.local/bin, self-updating. Not npm: the box
+# has two Node installs (fnm's, user-owned, and the root-owned nodesource
+# package), and npm-installed claude breaks `claude doctor`/auto-update when a
+# non-interactive shell resolves the root-owned /usr/bin/npm.
+run_user "curl -fsSL https://claude.ai/install.sh | bash"
 # gws (Google Workspace CLI) — backs /brain and the gwsa multi-account wrapper.
 # Pinned; auth is a manual post-deploy step (gwsa login <slot>).
 run_node "npm install -g @googleworkspace/cli@0.22.5"
@@ -71,10 +75,7 @@ chown -R "$USERNAME:$USERNAME" "$H/.config/agent-shared"
 run_user "python3 $H/.config/agent-shared/sync.py --instructions-only"
 chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
 
-echo "=== GSD (registers skills + hooks into ~/.claude/) ==="
-run_node "GSD_PORTABLE_HOOKS=1 npx get-shit-done-cc@latest --claude --global"
-
-echo "=== Claude Code settings (merge, GSD may have written hooks) ==="
+echo "=== Claude Code settings (merge) ==="
 install -m 0644 "$PAYLOAD/claude/claude-settings-patch.js" /tmp/claude-settings-patch.js
 run_node "node /tmp/claude-settings-patch.js"
 rm -f /tmp/claude-settings-patch.js
@@ -237,6 +238,22 @@ WantedBy=multi-user.target
 NOVNCUNIT
 
 systemctl daemon-reload
+
+# devbox-guard: keep sshd and tailscaled responsive when agents saturate the
+# box (2026-10-06 stall). High CPU/IO weight + MemoryMin for both, Nice for
+# sshd (reset to 0 in login sessions by limits.conf), io delegated to user
+# managers so fleet.slice's IOWeight applies, and blk-iocost so IOWeight is
+# enforced at all. fleet.slice itself is installed by hq's `fleet.py up`.
+G="$PAYLOAD/devbox-guard"
+for u in ssh.service tailscaled.service system.slice user@.service; do
+  install -D -m 0644 "$G/$u.conf" "/etc/systemd/system/$u.d/90-devbox-guard.conf"
+done
+install -m 0644 "$G/limits.conf" /etc/security/limits.d/90-devbox-guard.conf
+install -m 0755 "$G/iocost.sh" /usr/local/sbin/devbox-iocost
+install -m 0644 "$G/devbox-iocost.service" /etc/systemd/system/devbox-iocost.service
+systemctl daemon-reload
+systemctl enable --now devbox-iocost.service
+
 # VNC requires a password — run `vncpasswd` before enabling, then:
 #   sudo systemctl enable --now vncserver@1 novnc
 
