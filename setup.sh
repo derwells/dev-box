@@ -35,13 +35,12 @@ echo "=== Node.js via fnm ==="
 run_user "curl -fsSL https://fnm.vercel.app/install | bash"
 run_node "fnm install --lts && fnm use --lts"
 
-echo "=== Claude Code + GSD + gws ==="
+echo "=== Claude Code + gws ==="
 # Native installer: binary in ~/.local/bin, self-updating. Not npm: the box
 # has two Node installs (fnm's, user-owned, and the root-owned nodesource
 # package), and npm-installed claude breaks `claude doctor`/auto-update when a
 # non-interactive shell resolves the root-owned /usr/bin/npm.
 run_user "curl -fsSL https://claude.ai/install.sh | bash"
-run_node "npm install -g get-shit-done-cc"
 # gws (Google Workspace CLI) — backs /brain and the gwsa multi-account wrapper.
 # Pinned; auth is a manual post-deploy step (gwsa login <slot>).
 run_node "npm install -g @googleworkspace/cli@0.22.5"
@@ -76,10 +75,7 @@ chown -R "$USERNAME:$USERNAME" "$H/.config/agent-shared"
 run_user "python3 $H/.config/agent-shared/sync.py --instructions-only"
 chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
 
-echo "=== GSD (registers skills + hooks into ~/.claude/) ==="
-run_node "GSD_PORTABLE_HOOKS=1 npx get-shit-done-cc@latest --claude --global"
-
-echo "=== Claude Code settings (merge, GSD may have written hooks) ==="
+echo "=== Claude Code settings (merge) ==="
 install -m 0644 "$PAYLOAD/claude/claude-settings-patch.js" /tmp/claude-settings-patch.js
 run_node "node /tmp/claude-settings-patch.js"
 rm -f /tmp/claude-settings-patch.js

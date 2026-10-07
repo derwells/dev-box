@@ -17,7 +17,7 @@ Remote development server provisioned with OpenTofu on Hetzner Cloud. One comman
 - `variables.tf` — all configurable inputs
 - `outputs.tf` — public IP, SSH command after deploy
 - `cloud-init.yaml.tftpl` — bootstrap only: user, packages, GitHub CLI/auth, Tailscale, UFW (must stay under 32KiB rendered)
-- `setup.sh` — everything else: Node/fnm, Claude Code + GSD + plugins, claudex, gws/gwsa, skills, shell env, Playwright, VNC. Idempotent-ish; re-runnable by hand as root if an apply fails partway
+- `setup.sh` — everything else: Node/fnm, Claude Code (native installer) + plugins, claudex, gws/gwsa, skills, shell env, Playwright, VNC. Idempotent-ish; re-runnable by hand as root if an apply fails partway
 - `files/` — verbatim payload uploaded to `/root/provision` (no secrets): `bin/claudex`, `agent-shared/` (instruction sources + `sync.py`; renders `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`), `claude/` (statusline, search bridge, settings patch, `skills/claudex` + `skills/brain`), `gws-accounts/` (gwsa tool + per-slot email/scopes manifests), `home/` (zshrc, zshenv, tmux.conf, starship.toml)
 - `terraform.tfvars` — secrets (gitignored)
 - `files/agent-attention/` — local Claude/Codex lifecycle observer, F12 panel, tmux include, user systemd unit, and tests. `setup.sh` installs it; no session data, credentials, or Telegram sending. See its README for state semantics and regression tests.
