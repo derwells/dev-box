@@ -25,7 +25,7 @@ PAYLOAD="/root/provision"
 # Run a command as the user with fnm's node on PATH (non-interactive shells
 # don't source .zshrc/.bashrc, so the PATH must be set explicitly).
 run_node() {
-  su - "$USERNAME" -c "export PATH=\"$H/.local/share/fnm:\$PATH\" && eval \"\$(fnm env)\" && $*"
+  su - "$USERNAME" -c "export PATH=\"$H/.local/bin:$H/.local/share/fnm:\$PATH\" && eval \"\$(fnm env)\" && $*"
 }
 run_user() {
   su - "$USERNAME" -c "$*"
@@ -36,7 +36,12 @@ run_user "curl -fsSL https://fnm.vercel.app/install | bash"
 run_node "fnm install --lts && fnm use --lts"
 
 echo "=== Claude Code + GSD + gws ==="
-run_node "npm install -g @anthropic-ai/claude-code get-shit-done-cc"
+# Native installer: binary in ~/.local/bin, self-updating. Not npm: the box
+# has two Node installs (fnm's, user-owned, and the root-owned nodesource
+# package), and npm-installed claude breaks `claude doctor`/auto-update when a
+# non-interactive shell resolves the root-owned /usr/bin/npm.
+run_user "curl -fsSL https://claude.ai/install.sh | bash"
+run_node "npm install -g get-shit-done-cc"
 # gws (Google Workspace CLI) — backs /brain and the gwsa multi-account wrapper.
 # Pinned; auth is a manual post-deploy step (gwsa login <slot>).
 run_node "npm install -g @googleworkspace/cli@0.22.5"

@@ -1,2 +1,9 @@
 # Cargo (present once anything installs a Rust toolchain)
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# ~/.local/bin (native Claude Code, uv tools) for every zsh, including the
+# non-interactive ones `ssh host cmd` and agents' tool shells start.
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
