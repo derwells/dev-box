@@ -11,7 +11,7 @@ gitignored files or on the box. `tests/check-public.sh` enforces that.
 | Path | Server | Status |
 |------|--------|--------|
 | **Dedicated (Robot)** | Hetzner EX44-1-LTD (i5-13500, 64 GB, 2 x 512 GB NVMe), `dev-box` | Primary. Tailscale-only after lockdown. See [`dedicated/README.md`](dedicated/README.md), [`dedicated/START.md`](dedicated/START.md), [`dedicated/DESIGN.md`](dedicated/DESIGN.md). |
-| **hcloud (legacy)** | Cloud VM `dev-box-1`, provisioned with OpenTofu | Stays until it is retired. `main.tf`, `variables.tf`, `outputs.tf`, `cloud-init.yaml.tftpl`, `terraform.tfvars.example` and `data-volume.sh` are legacy: do not move or delete them, because state held elsewhere would plan a destroy. |
+| **hcloud (legacy)** | Cloud VM `dev-box-1`, provisioned with OpenTofu | Legacy, removed once dev-box-1 is retired (October 2026). Until the server is destroyed, leave `main.tf`, `variables.tf`, `outputs.tf`, `cloud-init.yaml.tftpl`, `terraform.tfvars.example` and `data-volume.sh` in place. |
 
 Both paths upload the same `files/` payload and run the same `setup.sh`.
 
@@ -51,27 +51,12 @@ dedicated/up.sh lockdown  <public-ip>   # drop public 22 once tailnet SSH works
 Then follow [`dedicated/START.md`](dedicated/START.md) (logins, Google slots, cloning `~/dev`).
 Run `tests/smoke-dedicated.sh` on the box to verify.
 
-## hcloud path (legacy)
+## hcloud path (legacy, removed once dev-box-1 is retired, October 2026)
 
-Prerequisites: OpenTofu, the `hcloud` CLI, a Hetzner Cloud API token, a Tailscale account and an
-SSH key pair.
-
-```bash
-cp terraform.tfvars.example terraform.tfvars   # fill in the Hetzner token etc. (gitignored)
-tofu init && tofu apply
-```
-
-Cloud-init bootstraps the user, packages, `gh`, Tailscale and UFW; then OpenTofu uploads `files/`
-and `setup.sh` over SSH and runs it (Hetzner caps `user_data` at 32 KiB, so the bulk cannot live in
-cloud-init). If `setup.sh` fails partway it is safe to re-run:
-
-```bash
-ssh root@<public-ip> 'bash /root/setup.sh <username> "<git name>" <git email>'
-```
-
-Without a Tailscale auth key, run `sudo tailscale up` on the box and approve it in the admin
-console. Day-to-day: `hcloud server list|ssh|reboot dev-box-1`, `tofu destroy` to tear down.
-Cost on this path: a Hetzner Cloud VM plus a 200 GB volume; Tailscale is free.
+OpenTofu + cloud-init for the Cloud VM `dev-box-1`: `cp terraform.tfvars.example terraform.tfvars`,
+then `tofu init && tofu apply`. Cloud-init bootstraps; OpenTofu then uploads `files/` and runs
+`setup.sh`, which can be re-run by hand as root. These files are deleted after the server is
+destroyed; nothing new should depend on them.
 
 ## Post-install logins (one-time)
 
@@ -210,5 +195,4 @@ Host dev-box
 
 ## Costs
 
-Dedicated: the Hetzner EX44 monthly fee (see Hetzner's current pricing). hcloud (legacy): a Cloud
-VM plus a 200 GB volume. Tailscale is free for personal use.
+Dedicated: the Hetzner EX44 monthly fee (see Hetzner's current pricing). Tailscale is free for personal use.

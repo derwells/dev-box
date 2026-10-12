@@ -1,6 +1,6 @@
 # Dev Box
 
-Remote development server for coding agents. The **dedicated Hetzner Robot server `dev-box`** (EX44, Tailscale-only) is the primary path; the OpenTofu/hcloud path for the Cloud VM `dev-box-1` is legacy until that VM is retired. **This repo is public** (see Conventions).
+Remote development server for coding agents. The **dedicated Hetzner Robot server `dev-box`** (EX44, Tailscale-only) is the primary path; the OpenTofu/hcloud path for the Cloud VM `dev-box-1` is legacy, removed once dev-box-1 is retired (October 2026). **This repo is public** (see Conventions).
 
 ## Stack
 
@@ -13,7 +13,7 @@ Remote development server for coding agents. The **dedicated Hetzner Robot serve
 
 ## Files
 
-- **Legacy hcloud, do not move or delete** (state held elsewhere would plan a destroy): `main.tf` (server, key, firewall, provisioners), `variables.tf`, `outputs.tf`, `cloud-init.yaml.tftpl` (must stay under 32KiB rendered), `terraform.tfvars.example`, `data-volume.sh`
+- **Legacy hcloud, leave in place until dev-box-1 is destroyed, then delete** (October 2026): `main.tf` (server, key, firewall, provisioners), `variables.tf`, `outputs.tf`, `cloud-init.yaml.tftpl` (must stay under 32KiB rendered), `terraform.tfvars.example`, `data-volume.sh`
 - `setup.sh` — everything else: Node/fnm, Claude Code (native installer) + plugins (superpowers, context7), claudex + `claudex-mimo-search`, gws/gwsa, skills, shell env, Playwright, VNC, devbox-guard. Idempotent-ish; re-runnable by hand as root if an apply fails partway
 - `files/` — verbatim payload uploaded to `/root/provision` (no secrets): `bin/claudex`, `bin/claudex-mimo-search`, `agent-shared/` (instruction sources, `skills/model-check`, `sync.py`; renders `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`), `claude/` (statusline, settings patch, hooks, `skills/claudex` + `skills/brain`), `gws-accounts/` (gwsa tool + per-slot email/scopes manifests), `home/` (zshrc, zshenv, tmux.conf, starship.toml)
 - `terraform.tfvars` — secrets for the legacy path (gitignored)
