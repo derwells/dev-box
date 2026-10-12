@@ -86,3 +86,27 @@ Prints PASS/FAIL per check, non-zero exit on any FAIL: hostname, tailscale up as
 listening on 0.0.0.0, devbox-guard drop-ins + devbox-iocost active, fleet.slice + hygiene timers
 present (after post-hq), and `claude codex uv pnpm gh tmux node docker` on PATH with versions,
 Playwright chromium installed, codex `[tui]` keys set.
+
+## Security: Tailscale-only (Derick, 2026-10-12: "secured by tailscale too to avoid hackers")
+
+Goal: nothing on the public IP accepts connections once bootstrap ends. Layers:
+
+1. **Robot firewall** (Derick sets it in Robot, network level, survives OS mistakes): inbound allow
+   only TCP 22 from dev-box-1's public IP during bootstrap, plus established/related and
+   outbound; delete the 22 rule at lockdown. Tailscale needs no inbound port.
+2. **UFW**: deny incoming, allow in on `tailscale0`; bootstrap allows 22 only
+   `from <dev-box-1 public IP>`, never from anywhere; lockdown deletes it.
+3. **Docker bypasses UFW** (it writes its own iptables rules). dev-box-1 publishes Supabase on
+   `0.0.0.0:5432x` and is shielded only by the Hetzner Cloud firewall; the dedicated box has no
+   cloud firewall. So: `/etc/docker/daemon.json` `"ip": "127.0.0.1"` (default publish address)
+   and a `DOCKER-USER` iptables rule that drops new inbound from the public interface
+   (persisted via a small systemd unit after docker.service).
+4. **sshd**: keys only (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`),
+   `PermitRootLogin prohibit-password` during bootstrap, `no` at lockdown. Day-to-day access is
+   Tailscale SSH.
+5. **Services** (noVNC, VNC, hqweb, sieve, paseo) bind the tailnet IP or localhost, never 0.0.0.0.
+6. `unattended-upgrades` enabled for security updates.
+
+Smoke adds: `ss -tlnH` shows no listener on 0.0.0.0/[::] except sshd (firewalled), `DOCKER-USER`
+drop rule present, docker `ip` = 127.0.0.1, sshd password auth off, and an external probe from
+dev-box-1 to the public IP on 22 and the Docker ports times out after lockdown.
