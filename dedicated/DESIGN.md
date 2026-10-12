@@ -16,6 +16,9 @@ first steps after lockdown are in [`START.md`](START.md).
   `gws` and the four `gwsa` slots.
 - Derick, 2026-10-12: agents may copy static secret files between his machines, without reading or
   printing them (supersedes the brief's "Derick transfers secrets himself"); the sieve key was copied.
+- `hq-devbox-setup-9` (2026-10-12): applied. Node approved as `dev-box`; public 22 locked down.
+- `hq-devbox-setup-8` (2026-10-12): applied. This branch's history was rewritten to drop an IP and a
+  tailnet name; `main` was checked and left alone.
 - `hq-devbox-setup-7` (2026-10-12): applied. No rsync of repos or state; ongoing work finishes on
   `dev-box-1`. On `dev-box`, repos are cloned fresh from their remotes by `clone-dev.sh` from a
   private manifest (`~/.config/dev-box/repos.tsv`, made by `dev-inventory.py`, never committed).
