@@ -13,8 +13,20 @@ is committed to this repo: secrets, manifests and `.env` files stay private.
 - [ ] `~/.ssh`: generate fresh keys where possible (`ssh-keygen -t ed25519`) and register the public
   keys with the services that need them. Do not copy the whole directory. Keep the key that
   `ssh dev-box` uses in `authorized_keys`.
-- [ ] Google slots: for each of `personal`, `angkin`, `pymc`, `ce`, drop the shared OAuth client JSON
-  into `~/.config/gws-accounts/<slot>/`, then `gwsa login <slot>`. Check with `gwsa status --verify`.
+- [ ] Google slots (`personal`, `angkin`, `pymc`, `ce`). `gws` and `gwsa` are installed and each
+  slot holds only `email` + `scopes`. Run this yourself on `dev-box-1`; it copies only the
+  credential files (they are encrypted with each slot's own `.encryption_key`, so they move together):
+  ```
+  for s in personal angkin pymc ce; do
+    rsync -a --ignore-missing-args --chmod=D700,F600 \
+      ~/.config/gws-accounts/$s/{client_secret.json,credentials.enc,.encryption_key,token_cache.json} \
+      dev-box:.config/gws-accounts/$s/
+  done
+  ssh dev-box gwsa status --verify
+  ```
+  Any slot that does not verify (or has no `credentials.enc`), run `gwsa login <slot>` on `dev-box`.
+  Both boxes run the daily `gwsa check --notify` cron, so expect duplicate pings until `dev-box-1`
+  is retired (or remove its line with `crontab -e`).
 - [ ] Token files under `~/.claude` (mode 600): `mimo_token`, `mimo_paygo_token` (only if used),
   `telegram_bot_token`, `telegram_chat_id`. Run one Telegram poller at a time.
 - [ ] Per-repo `.env` files: recreate by hand in each repo after cloning (`.env.example` is in git).

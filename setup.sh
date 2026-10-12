@@ -44,6 +44,16 @@ run_user "curl -fsSL https://claude.ai/install.sh | bash"
 # gws (Google Workspace CLI) — backs /brain and the gwsa multi-account wrapper.
 # Pinned; auth is a manual post-deploy step (gwsa login <slot>).
 run_node "npm install -g @googleworkspace/cli@0.22.5"
+# Stable `gws` on PATH for non-interactive shells and cron (fnm's multishell dir
+# is only on PATH in interactive shells). Follows fnm's default Node.
+mkdir -p "$H/.local/bin"
+cat > "$H/.local/bin/gws" << 'GWSSHIM'
+#!/bin/sh
+D="$HOME/.local/share/fnm/aliases/default/bin"
+PATH="$D:$PATH" exec "$D/gws" "$@"
+GWSSHIM
+chmod 0755 "$H/.local/bin/gws"
+chown -R "$USERNAME:$USERNAME" "$H/.local"
 
 echo "=== claudex wrapper ==="
 install -m 0755 "$PAYLOAD/bin/claudex" /usr/local/bin/claudex

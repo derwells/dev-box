@@ -99,6 +99,17 @@ for t in claude codex uv pnpm gh tmux node docker; do
     fail "$t not on PATH"
   fi
 done
+if command -v gws >/dev/null 2>&1 && v=$(gws --version 2>/dev/null | head -n1) && [ -n "$v" ]; then
+  pass "gws: $v (non-interactive PATH)"
+else
+  fail "gws --version failed on a non-interactive PATH"
+fi
+gs=$(gwsa status 2>&1)
+if [ -n "$gs" ] && echo "$gs" | grep -q personal && echo "$gs" | grep -q angkin && echo "$gs" | grep -q pymc && echo "$gs" | grep -qw ce; then
+  pass "gwsa status lists slots personal angkin pymc ce"
+else
+  fail "gwsa status does not list all four slots"
+fi
 ls "$HOME"/.cache/ms-playwright/chromium-* >/dev/null 2>&1 && pass "Playwright chromium installed" || fail "Playwright chromium missing"
 cfg="$HOME/.codex/config.toml"
 grep -qE '^alternate_screen *= *"never"' "$cfg" 2>/dev/null && grep -qE '^fullscreen_transcript *= *false' "$cfg" 2>/dev/null \
