@@ -33,7 +33,7 @@ run_user() {
 
 echo "=== Node.js via fnm ==="
 run_user "curl -fsSL https://fnm.vercel.app/install | bash"
-run_node "fnm install --lts && fnm use --lts"
+run_node "fnm install --lts && fnm default lts-latest"
 
 echo "=== Claude Code + gws ==="
 # Native installer: binary in ~/.local/bin, self-updating. Not npm: the box
