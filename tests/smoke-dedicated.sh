@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # smoke-dedicated.sh — acceptance smoke for the dedicated (Robot) dev-box.
 #
-#   smoke-dedicated.sh                      # on the box, as the user (needs passwordless sudo)
+#   zsh -lic smoke-dedicated.sh             # on the box, as the user, login shell (fnm tools), passwordless sudo
 #   smoke-dedicated.sh --probe <public-ip>  # from another machine: public ports must time out
 #
 # Env: SMOKE_PROBE_PORTS (space list, default "22 80 443 5432 54321 54322 54323 6080 5901 8080")
