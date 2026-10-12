@@ -30,6 +30,8 @@ is committed to this repo: secrets, manifests and `.env` files stay private.
 - [ ] Token files under `~/.claude` (mode 600): `mimo_token`, `mimo_paygo_token` (only if used),
   `telegram_bot_token`, `telegram_chat_id`. Run one Telegram poller at a time.
 - [ ] Per-repo `.env` files: recreate by hand in each repo after cloning (`.env.example` is in git).
+- [ ] sieve key: from `dev-box-1`, `scp ~/.config/sieve/env dev-box:.config/sieve/env` (mode 600;
+  `ssh dev-box mkdir -p -m 700 .config/sieve` first), then `ssh dev-box systemctl --user restart sieve`.
 - [ ] Optional noVNC: `vncpasswd` (stored in `~/.vnc/passwd`).
 
 ## b) Clone `~/dev`
@@ -47,6 +49,18 @@ is committed to this repo: secrets, manifests and `.env` files stay private.
 - [ ] `~/dev/dev-box/dedicated/post-hq.sh ~/dev/hq`: installs `fleet.slice` and the hygiene timers
   (runs `fleet.py up`); fleet state starts fresh.
 - [ ] `python3 ~/dev/hq/fleet/fleet.py doctor`.
+
+## c2) Private services (user units, tailnet or loopback only)
+
+- [ ] hqweb: `uv sync --project ~/dev/hq/web/server`, `pnpm install && pnpm build` in
+  `~/dev/hq/web/client`, `sh ~/dev/hq/web/server/deploy/renew-cert.sh`, copy the three units from
+  `~/dev/hq/web/server/deploy/` to `~/.config/systemd/user/`, then
+  `systemctl --user enable --now hqweb.service hqweb-cert.timer`. Re-install the phone app from the
+  new `https://dev-box.<tailnet>.ts.net:8766` address (push subscriptions are per address).
+- [ ] sieve: `uv sync` in `~/dev/sieve`, render `contrib/sieve.service` per its README (PATH must
+  reach uv, claude and fnm's codex), `systemctl --user enable --now sieve`, then after the logins in
+  (a): `claude mcp add --scope user --transport http sieve http://127.0.0.1:8723/mcp` and the
+  `[mcp_servers.sieve]` block in `~/.codex/config.toml`.
 
 ## d) Rebuild environments
 
