@@ -19,7 +19,13 @@ HYGIENE=$(find_script hygiene.py)
 [ -n "$HYGIENE" ] || { echo "post-hq.sh: hygiene.py not found under $HQ" >&2; exit 1; }
 
 echo "=== fleet.slice (fleet.py up) ==="
-python3 "$FLEET" up
+# `fleet up` also launches the chief (claude). Before `claude login` that window
+# would sit on the onboarding screen, so wait until Claude is logged in.
+if [ -f "$HOME/.claude/.credentials.json" ]; then
+  python3 "$FLEET" up
+else
+  echo "post-hq.sh: claude is not logged in; skipping 'fleet up' (it launches the chief). Re-run after 'claude login'." >&2
+fi
 
 echo "=== fleet-watch (state loop service) ==="
 python3 "$FLEET" service install
