@@ -10,8 +10,7 @@ Provisioned with OpenTofu on Hetzner Cloud. One command to create, one to destro
 Hetzner CPX31 (4 vCPU, 8GB RAM, ~$12/mo)
 Ubuntu Server 24.04
 ├── Tailscale          — private mesh networking, no public ports
-├── Claude Code        — Node.js + npm
-│   ├── GSD            — get-shit-done workflow skills + hooks
+├── Claude Code        — native installer (~/.local/bin)
 │   ├── Superpowers    — plugin (official marketplace)
 │   ├── Context7       — plugin (official marketplace)
 │   └── Humanizer      — writing skill

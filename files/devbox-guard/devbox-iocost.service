@@ -1,0 +1,11 @@
+[Unit]
+Description=Enable blk-iocost so cgroup IOWeight is enforced
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/devbox-iocost
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

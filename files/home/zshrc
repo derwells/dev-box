@@ -51,6 +51,10 @@ command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
 
 # Auto-attach to tmux session "main" (or create it). Interactive shells only,
 # so provisioning/`ssh host <cmd>` runs are never swallowed by tmux.
+# A fresh tmux server starts in fleet.slice (low CPU/IO weight): tmux puts
+# every pane in its server's slice, so agents can't starve sshd/tailscaled.
 if [[ $- == *i* ]] && command -v tmux >/dev/null 2>&1 && [ -z "$TMUX" ]; then
+  tmux ls >/dev/null 2>&1 || systemd-run --user --scope --quiet --slice=fleet.slice \
+    --unit=default-tmux tmux new-session -d -s main 2>/dev/null
   tmux attach -t main 2>/dev/null || tmux new -s main
 fi

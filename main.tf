@@ -107,3 +107,21 @@ resource "hcloud_server" "dev_box" {
     ]
   }
 }
+
+# Data volume at /mnt/data (docker/containerd state, ~/.cache, ~/.npm), mounted
+# and populated by data-volume.sh. Created by hand on 2026-10-07; adopt it into
+# state before the next apply, or tofu will create a second one:
+#   tofu import hcloud_volume.data 107062748
+#   tofu import hcloud_volume_attachment.data 107062748
+resource "hcloud_volume" "data" {
+  name     = "dev-box-data"
+  size     = var.data_volume_size
+  location = var.location
+  format   = "ext4"
+}
+
+resource "hcloud_volume_attachment" "data" {
+  volume_id = hcloud_volume.data.id
+  server_id = hcloud_server.dev_box.id
+  automount = false
+}
