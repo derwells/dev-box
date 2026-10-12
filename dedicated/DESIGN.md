@@ -3,14 +3,17 @@
 Agreed brief for the `hq-devbox-setup` effort. Source: `~/dev/hq/docs/briefs/hq-devbox-setup.md`
 (Derick, 2026-10-12) and `~/dev/hq/docs/reviews/devbox-upgrade-2026-10.md`.
 
+Amendment `hq-devbox-setup-3` (chief on Derick's OK, 2026-10-12): **applied**, verified. dev-box-1's
+OS hostname is `dev-box-1`, `/etc/hosts` line 8 is `127.0.1.1 dev-box-1 dev-box-1`, and dev-box-1's
+`~/.ssh/config` maps `Host dev-box` to `dev-box.<tailnet>.ts.net` (user derick, key
+`~/.ssh/dev-box_ed25519`). So `ssh dev-box` from dev-box-1 reaches the new node once it joins;
+bootstrap must leave that key in derick's authorized_keys. Supersedes the hostname caveat in -1.
+
 Amendment `hq-devbox-setup-2` (chief, 2026-10-12): **applied**. Key file is `~/.ssh/dev-box_ed25519`, same
 fingerprint SHA256:916R5RzxOo6mrL4ptGwfm1P2DDZbwbz9AFHf8rN1ydU.
 
 Amendment `hq-devbox-setup-1` (Derick via chief, 2026-10-12 07:5xZ): **applied**. The new server is
 named `dev-box` (hostname, Tailscale node, Robot key name, docs); the current machine is `dev-box-1`.
-Caveat: dev-box-1's own OS hostname is still `dev-box` (`/etc/hostname`, `/etc/hosts` 127.0.1.1), so
-on dev-box-1 a bare `ssh dev-box` resolves to itself until that is changed or an ssh alias is added.
-Docs and scripts here use the MagicDNS FQDN or an explicit target IP, never a bare `dev-box` lookup.
 
 Target: Hetzner EX44-1-LTD (i5-13500, 64 GB, 2 x 512 GB NVMe), Robot-managed, no cloud-init,
 no OpenTofu resource. Tailscale name `dev-box`. The hcloud path (`main.tf`,
