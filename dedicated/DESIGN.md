@@ -7,6 +7,12 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-13` (2026-10-12): applied. `START.md` is now the ordered switchover checklist
+  (owner, now or Rust, done marks). Done now: live static secrets copied file to file (aide Paste
+  writes only on the aide host, `dev-box-1`, so no Paste requests were needed), Claude/Codex
+  settings, MCP servers and personal skills, `setup.sh` re-run with this branch. sieve had been
+  crash-looping since the -12 report because its env sources the `hq` `.env`; fixed by copying it
+  and starting SearXNG.
 - `hq-devbox-setup-12` (2026-10-12): applied. Order: update all repos first (push the safe
   ones from `dev-box-1`, list the rest for Derick), then clone and verify on `dev-box`. Do not install or
   run fleet on `dev-box` until hq's Rust port lands; smoke reports those checks as `DEFER`. Supersedes

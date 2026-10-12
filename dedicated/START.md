@@ -1,77 +1,106 @@
-# Start working on dev-box
+# Switch over to dev-box
 
-Checklist after `up.sh lockdown`. Run as the login user on `dev-box` unless noted. No repo copy and
-no cutover: ongoing work finishes on `dev-box-1`; `dev-box` clones fresh from remotes. Nothing here
-is committed to this repo: secrets, manifests and `.env` files stay private.
+The order to follow when moving from `dev-box-1` to `dev-box`, as of 2026-10-12. Each item shows who
+does it (**lead** or **Derick**) and when: **now**, or **Rust** (after the Rust port of fleet lands).
+`[x]` means done and verified. No logs, session history, fleet state or Docker volumes move. Repos
+are cloned fresh. Secrets, manifests and `.env` files never enter this repo.
 
-## a) Logins and secrets (you move or recreate these)
+**How secrets move.** aide's Paste flow (hq `aide/README.md`, "Asking Derick for a key") saves a
+value on the machine aide runs on, which is `dev-box-1` until aide moves. A Paste therefore cannot
+put a value on `dev-box`. Values that already exist are copied file to file, under Derick's
+2026-10-12 permission, and never opened or printed. Paste is only for values that exist nowhere yet
+(new or rotated keys). None are needed now. Claude and Codex OAuth logins are never copied.
 
-- [ ] `claude login` (headless URL flow).
-- [ ] `codex login`.
-- [ ] `gh auth login`, then `gh auth setup-git`.
-- [ ] Git identity: `git config --global user.name; git config --global user.email` (set by `setup.sh`).
-- [ ] `~/.ssh`: generate fresh keys where possible (`ssh-keygen -t ed25519`) and register the public
-  keys with the services that need them. Do not copy the whole directory. Keep the key that
-  `ssh dev-box` uses in `authorized_keys`.
-- [ ] Google slots (`personal`, `angkin`, `pymc`, `ce`). `gws` and `gwsa` are installed and each
-  slot holds only `email` + `scopes`. Run this yourself on `dev-box-1`; it copies only the
-  credential files (they are encrypted with each slot's own `.encryption_key`, so they move together):
-  ```
-  for s in personal angkin pymc ce; do
-    rsync -a --ignore-missing-args --chmod=D700,F600 \
-      ~/.config/gws-accounts/$s/{client_secret.json,credentials.enc,.encryption_key,token_cache.json} \
-      dev-box:.config/gws-accounts/$s/
-  done
-  ssh dev-box gwsa status --verify
-  ```
-  Any slot that does not verify (or has no `credentials.enc`), run `gwsa login <slot>` on `dev-box`.
-  Both boxes run the daily `gwsa check --notify` cron, so expect duplicate pings until `dev-box-1`
-  is retired (or remove its line with `crontab -e`).
-- [ ] Token files under `~/.claude` (mode 600): `mimo_token`, `mimo_paygo_token` (only if used),
-  `telegram_bot_token`, `telegram_chat_id`. Run one Telegram poller at a time.
-- [ ] Per-repo `.env` files: recreate by hand in each repo after cloning (`.env.example` is in git).
-- [ ] sieve key: from `dev-box-1`, `scp ~/.config/sieve/env dev-box:.config/sieve/env` (mode 600;
-  `ssh dev-box mkdir -p -m 700 .config/sieve` first), then `ssh dev-box systemctl --user restart sieve`.
-- [ ] Optional noVNC: `vncpasswd` (stored in `~/.vnc/passwd`).
+## 1. Base
 
-## b) Clone `~/dev`
+- [x] `up.sh install`, `provision`, Tailscale node `dev-box`, `lockdown`. **lead**
+- [x] Logins: `claude login`, `codex login`, `gh auth login` + `gh auth setup-git`. **Derick**
+- [x] Repos cloned from the private manifest (`~/.config/dev-box/repos.tsv`, `clone-dev.sh`), with
+  every HEAD equal to origin and every tree clean. **lead**
+- [ ] Settle the push list on `dev-box-1` (`~/.config/dev-box/push-list.md`): repos with no remote,
+  client repos, protected branches, one diverged branch. **Derick, now**
 
-- [ ] From `dev-box-1`, copy the private manifest (never committed):
-  `ssh dev-box mkdir -p -m 700 .config/dev-box && scp ~/.config/dev-box/repos.tsv dev-box:.config/dev-box/`
-- [ ] On `dev-box`: `gh repo clone derwells/dev-box ~/dev/dev-box`, then
-  `~/dev/dev-box/dedicated/clone-dev.sh --dry-run` and `~/dev/dev-box/dedicated/clone-dev.sh`
-  (needs `gh` auth from (a); skips anything already present, so `dev-box` itself is skipped).
-- [ ] Repos the inventory marks as having no remote are not in the manifest: push them to a new
-  private remote from `dev-box-1` first, or decide to leave them behind.
+## 2. Secrets
 
-## c) hq and fleet (deferred until the Rust port of fleet lands)
+- [x] Google slots `personal` and `pymc`: credential files copied, `gwsa status --verify` OK. **lead**
+- [ ] `angkin`: its refresh token is expired on both machines. Run `gwsa login angkin` on `dev-box`.
+  **Derick, now**
+- [ ] `ce`: never logged in (its client secret is copied). Run `gwsa login ce` on `dev-box`. **Derick, now**
+- [x] TypeSafe key for sieve: `~/.config/sieve/env` plus the `.env` it sources. **lead**
+- [x] SSH keys still in use: the SiteGround key and one other deploy key, mode 600. `dev-box_ed25519`
+  stays where it is; `gcloud compute ssh` makes its own key on first use. **lead**
+- [x] `~/.claude` token files (Telegram, MiMo, provider and tool API keys). The dead `hcloud_token`
+  was left behind. **lead**
+- [x] Per-repo `.env` files for every cloned repo where git ignores `.env` (one repo tracks its own).
+  Repos with no remote are not cloned, so their `.env` waits on the push list. **lead**
+- [ ] aide Discord token (`~/.config/aide/discord_token`) and `~/.config/aide/config.toml`: copy when
+  aide moves (section 4). **lead, Rust**
+- [ ] Notion MCP: authorize it with `/mcp` inside `claude`. **Derick, now**
+- [ ] Optional: `vncpasswd` for noVNC. **Derick, now**
 
-Do not install or run fleet on `dev-box` yet. When the port is ready:
+## 3. Config
 
-- [ ] `~/dev/dev-box/dedicated/post-hq.sh ~/dev/hq`: installs `fleet.slice` and the hygiene timers
-  (runs `fleet.py up`); fleet state starts fresh.
-- [ ] `python3 ~/dev/hq/fleet/fleet.py doctor`.
+- [x] `~/.claude/settings.json` (everything except hooks), `output-styles/`, `rules/`; user MCP
+  servers `daimon` and `sieve`. **lead**
+- [x] Personal skills in `~/.claude/skills`, linked from `~/.agents/skills`. Git-backed skills are
+  cloned from their remotes. Paseo skills are left out. **lead**
+- [x] `~/.codex/config.toml` top-level settings (model, approvals, sandbox, effort) merged above
+  `[tui]`. Codex re-adds project trust entries on first use. **lead**
+- [x] `setup.sh` re-run with this branch, so `files/` (claudex search, model-check, shared
+  instructions) matches the repo. **lead**
+- [ ] hq-owned skills (`chief`, `lead`, `dispatch`, `advise`, `research-fanout`, `discord-catchup`),
+  Claude fleet hooks (`readonly_approve`, `delegation_guard`), Codex `hooks.json` and the
+  `{low,medium,high}.config.toml` profiles. They call fleet, and the port changes their paths.
+  **lead, Rust**
+- [ ] Optional: the Android binder module, needed only for Android emulator work:
+  `apt install linux-modules-extra-$(uname -r)`, `modprobe binder_linux`, then persist it in
+  `/etc/modules-load.d/`. **lead, now on request**
 
-## c2) Private services (user units, tailnet or loopback only)
+## 4. Services and timers
 
-- [ ] hqweb: `uv sync --project ~/dev/hq/web/server`, `pnpm install && pnpm build` in
-  `~/dev/hq/web/client`, `sh ~/dev/hq/web/server/deploy/renew-cert.sh`, copy the three units from
-  `~/dev/hq/web/server/deploy/` to `~/.config/systemd/user/`, then
-  `systemctl --user enable --now hqweb.service hqweb-cert.timer`. Re-install the phone app from the
-  new `https://dev-box.<tailnet>.ts.net:8766` address (push subscriptions are per address).
-- [ ] sieve: `uv sync` in `~/dev/sieve`, render `contrib/sieve.service` per its README (PATH must
-  reach uv, claude and fnm's codex), `systemctl --user enable --now sieve`, then after the logins in
-  (a): `claude mcp add --scope user --transport http sieve http://127.0.0.1:8723/mcp` and the
-  `[mcp_servers.sieve]` block in `~/.codex/config.toml`.
+User units only, bound to loopback or the tailnet address.
 
-## d) Rebuild environments
+- [x] sieve, with its SearXNG container (`bin/sieve-searxng start`, loopback). **lead**
+- [x] `gwsa check --notify` cron (08:30), installed by `setup.sh`. Both machines ping until
+  `dev-box-1` is gone. **lead**
+- [ ] fleet-watch and `fleet.slice`: `dedicated/post-hq.sh ~/dev/hq`, adapted to the port. **lead, Rust**
+- [ ] `fleet-hygiene` and `fleet-hygiene-uv` timers. Derick said on 2026-10-12 they are not needed;
+  install them only if the port keeps them. **Derick decides, Rust**
+- [ ] hqweb and `hqweb-cert.timer`: merge hq PR #118, `uv sync` in `web/server`,
+  `pnpm install && pnpm build` in `web/client`, `deploy/renew-cert.sh`, copy the units from
+  `web/server/deploy/`, then enable them. **lead, Rust.** Afterwards, reinstall the phone app from
+  the new address (push subscriptions are per address). **Derick**
+- [ ] aide: run `aide/install.sh`, copy the token and config (section 2), stop it on `dev-box-1`,
+  then enable it on `dev-box`. Never run both, because they would post twice. **lead, Rust**
+- [ ] alpha-mill daily timer: it sends a fleet `say`, so its effort recreates it once fleet runs.
+  **lead, Rust**
+- [ ] The nightly Fly backup timer (`*-fly-backup`): needs `flyctl` (**lead**) and `fly auth login`
+  (**Derick**). Keep it only if that app's backups still matter, since its bot is not moving.
+  **Derick decides, now**
+- Not moving: the one-off `default-*` timers, paseo, and that app's bot.
 
-- [ ] Per repo as needed: `uv sync` (Python) or `pnpm install` (Node); `playwright install` if its tests
-  need a browser. Docker services and databases are recreated from each repo's own config.
-- [ ] Targeted tests only, at most `pytest -n 2`.
+## 5. Docker
 
-## e) Smoke
+- [ ] Rebuild each stack from its repo's compose or Supabase config when that work starts. No volume
+  copy; databases start empty. For example, the discord-bot Supabase stack: install the Supabase
+  CLI, then run `supabase start` in its repo. Docker publishes on 127.0.0.1 here, so ports that were
+  public on `dev-box-1` stay local. **lead, now (on demand)**
+- [ ] Per repo: `uv sync` or `pnpm install`; `playwright install` if needed. Run targeted tests only,
+  at most `pytest -n 2`. **lead, now (on demand)**
 
-- [ ] `tests/smoke-dedicated.sh` (as the user, on the box). From `dev-box-1`:
-  `tests/smoke-dedicated.sh --probe <public-ip>` must show public ports closed.
-- [ ] Reboot once and re-run the smoke.
+## 6. Chief
+
+- [ ] Start a fresh chief on `dev-box` with the ported fleet. No fleet state is copied. **Derick, Rust**
+
+## 7. Kill week for dev-box-1
+
+1. [ ] Ongoing efforts finish or hand off. Re-run `dev-inventory.py` on `dev-box-1`, push anything
+   safe, and settle the rest of the push list. **lead + Derick**
+2. [ ] On `dev-box-1`: stop aide (only after it runs on `dev-box`), remove the `gwsa check` crontab
+   line, and disable the remaining timers. **lead**
+3. [ ] On `dev-box`: run `tests/smoke-dedicated.sh`, reboot, and run it again. From the laptop:
+   `tests/smoke-dedicated.sh --probe <public-ip>` must show every public port closed. **lead**
+4. [ ] Delete the Cloud server (`tofu destroy` from the laptop, or the Hetzner console) and remove
+   its Tailscale node. **Derick**
+5. [ ] Delete the legacy hcloud files from this repo and the local tofu state. **lead**
+6. [ ] Laptop: remove `dev-box-1` from `~/.ssh/config`. **Derick**
