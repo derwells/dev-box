@@ -149,6 +149,11 @@ DUNIT
 systemctl daemon-reload
 systemctl enable devbox-docker-user.service
 
+echo "=== no printing services ==="
+# The desktop packages pull in CUPS, which listens on 0.0.0.0:631; a dev box needs no printers.
+systemctl disable --now cups.socket cups.service cups-browsed.service 2>/dev/null || true
+systemctl mask cups.socket cups.service cups-browsed.service 2>/dev/null || true
+
 echo "=== unattended-upgrades ==="
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 systemctl enable --now unattended-upgrades.service

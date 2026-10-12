@@ -45,8 +45,12 @@ swapon --show --noheadings --bytes 2>/dev/null | awk '$1=="/swapfile" && $3>=16*
   && pass "16G /swapfile active" || fail "16G /swapfile not active"
 [ "$(findmnt -no SOURCE /)" != "$(findmnt -no SOURCE /data 2>/dev/null)" ] && mountpoint -q /data \
   && pass "/ and /data are distinct mounts" || fail "/ and /data are not distinct devices"
-root_dev=$(findmnt -no SOURCE / | xargs -I{} lsblk -no PKNAME {} 2>/dev/null | head -n1)
-data_dev=$(findmnt -no SOURCE /data 2>/dev/null | xargs -I{} lsblk -no PKNAME {} 2>/dev/null | head -n1)
+disk_of() {  # whole disk under a mount; /data is a whole-disk filesystem with no PKNAME
+  local src pk; src=$(findmnt -no SOURCE "$1" 2>/dev/null) || return 0
+  pk=$(lsblk -no PKNAME "$src" 2>/dev/null | head -n1)
+  [ -n "$pk" ] && echo "$pk" || basename "$src"
+}
+root_dev=$(disk_of /); data_dev=$(disk_of /data)
 [ -n "$root_dev" ] && [ -n "$data_dev" ] && [ "$root_dev" != "$data_dev" ] \
   && pass "/ ($root_dev) and /data ($data_dev) on different disks" || fail "/ and /data share a disk"
 root="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null)"
@@ -89,7 +93,8 @@ systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygie
 # --- tools
 for t in claude codex uv pnpm gh tmux node docker; do
   if command -v "$t" >/dev/null 2>&1; then
-    pass "$t: $("$t" --version 2>&1 | head -n1)"
+    v=--version; [ "$t" = tmux ] && v=-V
+    pass "$t: $("$t" "$v" 2>&1 | head -n1)"
   else
     fail "$t not on PATH"
   fi
