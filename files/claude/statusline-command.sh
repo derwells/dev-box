@@ -1,159 +1,137 @@
 #!/usr/bin/env bash
-# Claude Code status line — 1-line layout using terminal's own 16-color palette
+# Claude Code status line: phone-first, one line, progressive disclosure.
+#
+#   repo F5.1 medium c●31 5●40 7●59       every gauge: dot plus percentage used
+#   repo F5.1 medium c●31 5●95·38m 7●59   over CRIT, or a reset within the hour, adds the reset
+#
+# Gauges: c = context used, 5 = 5-hour limit, 7 = 7-day limit.
+# The dot is the same glyph at every level; its colour carries the level:
+# grey below LOW, green from LOW, yellow from MID, orange from WARN, bold red from CRIT.
+# Wide pane (COLUMNS > STATUSLINE_WIDE) or `touch ~/.claude/statusline.full`:
+# every gauge also shows its reset. If the details do not fit on one line,
+# they move to a second line so the first stays short.
+export LC_ALL=C.UTF-8
 input=$(cat)
 
-cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // ""')
+LOW=${STATUSLINE_LOW:-25}
+MID=${STATUSLINE_MID:-50}
+WARN=${STATUSLINE_WARN:-75}
+CRIT=${STATUSLINE_CRIT:-90}
+WIDE=${STATUSLINE_WIDE:-100}
+cols=${COLUMNS:-80}
+
+# One jq pass; fields joined by \x1f so empty values keep their position.
+IFS=$'\x1f' read -r cwd model_name model_id effort ctx h5 h5r d7 d7r < <(
+  echo "$input" | jq -r '[
+    (.workspace.current_dir // .cwd // ""),
+    (.model.display_name // ""), (.model.id // ""), (.effort.level // ""),
+    (.context_window.used_percentage // "" | tostring),
+    (.rate_limits.five_hour.used_percentage // "" | tostring),
+    (.rate_limits.five_hour.resets_at // "" | tostring),
+    (.rate_limits.seven_day.used_percentage // "" | tostring),
+    (.rate_limits.seven_day.resets_at // "" | tostring)
+  ] | join("\u001f")'
+)
+
+esc() { printf '\033[%sm' "$1"; }
+C_DIR=$(esc "1;34"); C_BRANCH=$(esc "1;35"); C_DIRTY=$(esc "31"); C_DIM=$(esc "90")
+C_OK=$(esc "32"); C_MID=$(esc "33"); C_WARN=$(esc "38;5;208"); C_CRIT=$(esc "1;31"); RESET=$(esc "0")
+
+full=""
+{ [ "$cols" -gt "$WIDE" ] || [ -e ~/.claude/statusline.full ]; } && full=1
+now=$(date +%s)
 
 # ---------------------------------------------------------------------------
-# ANSI helpers — TMUX-safe
-# When running inside TMUX, escape sequences must be wrapped in a DCS passthrough
-# so TMUX forwards them to the outer terminal instead of swallowing them.
+# Location: cwd basename, branch only when not main/master, * when dirty
 # ---------------------------------------------------------------------------
-if [ -n "$TMUX" ]; then
-  esc() { printf '\033Ptmux;\033\033[%sm\033\\' "$1"; }
-else
-  esc() { printf '\033[%sm' "$1"; }
-fi
-
-# Standard ANSI 16-color codes — map to whatever palette Windows Terminal has set
-C_DIR=$(esc "1;34")        # bold blue   → directory
-C_BRANCH=$(esc "1;35")     # bold magenta → git branch
-C_DIRTY=$(esc "31")        # red          → dirty marker
-C_CTX_GREEN=$(esc "32")    # green
-C_CTX_YELLOW=$(esc "33")   # yellow
-C_CTX_RED=$(esc "31")      # red
-C_RATE_5H=$(esc "36")      # cyan         → 5-hour rate limit
-C_RATE_7D=$(esc "1;36")    # bold cyan    → 7-day (weekly) rate limit
-C_MODEL=$(esc "90")        # bright black → model name
-RESET=$(esc "0")
-SEP=" "                    # group separator: single space
-# ---------------------------------------------------------------------------
-# Directory: last 3 path segments with …/ prefix
-# ---------------------------------------------------------------------------
-short_dir=$(echo "$cwd" | awk -F'/' '{
-  n=NF
-  if ($n == "") n--
-  if (n <= 3) { print $0 }
-  else { printf "…/%s/%s/%s", $(n-2), $(n-1), $n }
-}')
-
-# ---------------------------------------------------------------------------
-# Git branch + dirty flag (bare * when dirty, no counts)
-# ---------------------------------------------------------------------------
-git_branch=""
-git_dirty=""
+loc="${C_DIR}${cwd##*/}${RESET}"
+loc_plain="${cwd##*/}"
 if [ -n "$cwd" ] && git -C "$cwd" rev-parse --git-dir > /dev/null 2>&1; then
-  git_branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null \
+  branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null \
     || git -C "$cwd" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+  case "$branch" in
+    main|master|"") ;;
+    *) loc="${loc} ${C_BRANCH}${branch}${RESET}"; loc_plain="${loc_plain} ${branch}" ;;
+  esac
   if git -C "$cwd" --no-optional-locks status --porcelain 2>/dev/null | grep -q .; then
-    git_dirty="*"
+    loc="${loc}${C_DIRTY}*${RESET}"; loc_plain="${loc_plain}*"
   fi
 fi
 
 # ---------------------------------------------------------------------------
-# Model: human-readable display name (drop " (1M context)" noise)
+# Model tag: "Fable 5.1" -> F5.1, "Opus 5.5" -> O5.5, "Sonnet 5" -> S5
 # ---------------------------------------------------------------------------
-model_name=$(echo "$input" | jq -r '.model.display_name // empty')
 model_name=${model_name/ (1M context)/}
-model_id=$(echo "$input" | jq -r '.model.id // empty')
-# Are we on a Fable model? (weekly limit is only surfaced for Fable)
+tag=""
+if [ -n "$model_name" ]; then
+  ver=$(printf '%s' "$model_name" | grep -oE '[0-9]+(\.[0-9]+)*' | head -1)
+  tag="${model_name:0:1}${ver}"
+  [ -z "$ver" ] && tag="${model_name:0:6}"
+fi
 is_fable=""
 case "$(printf '%s%s' "$model_id" "$model_name" | tr '[:upper:]' '[:lower:]')" in
   *fable*) is_fable=1 ;;
 esac
 
 # ---------------------------------------------------------------------------
-# Context window: fuel-gauge (used%, 0=fresh 100=full)
+# Gauges
 # ---------------------------------------------------------------------------
-used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
-ctx_str="ctx:—"
-ctx_color="${C_CTX_GREEN}"
-if [ -n "$used_pct" ]; then
-  used_int=$(printf "%.0f" "$used_pct")
-  ctx_str="ctx:${used_int}%"
-  if   [ "$used_int" -lt 50 ]; then ctx_color="${C_CTX_GREEN}"
-  elif [ "$used_int" -lt 75 ]; then ctx_color="${C_CTX_YELLOW}"
-  elif [ "$used_int" -lt 90 ]; then ctx_color="${C_CTX_YELLOW}"
-  else                               ctx_color="${C_CTX_RED}"
+# One code point for every gauge and level: no fill-level glyph set (pies,
+# quadrants, squares) drew at one size on the phone in JetBrains Mono or Fira Code.
+DOT=●
+
+countdown() {  # seconds -> 38m | 3h58m | 3d0h
+  local s=$1
+  if   [ "$s" -ge 86400 ]; then printf '%dd%dh' $((s / 86400)) $(((s % 86400) / 3600))
+  elif [ "$s" -ge 3600 ];  then printf '%dh%dm' $((s / 3600)) $(((s % 3600) / 60))
+  else                          printf '%dm' $((s / 60))
   fi
-fi
+}
 
-# ---------------------------------------------------------------------------
-# 5-hour rate limit: usage% + countdown (omit if expired or absent)
-# ---------------------------------------------------------------------------
-five_h_str=""
-five_h_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
-five_h_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
-if [ -n "$five_h_pct" ]; then
-  pct_int=$(printf "%.0f" "$five_h_pct")
-  countdown=""
-  if [ -n "$five_h_reset" ]; then
-    now=$(date +%s)
-    secs_left=$(( five_h_reset - now ))
-    if [ "$secs_left" -gt 0 ]; then
-      hrs=$(( secs_left / 3600 ))
-      mins=$(( (secs_left % 3600) / 60 ))
-      if [ "$hrs" -gt 0 ]; then
-        countdown=" (${hrs}h${mins}m)"
-      else
-        countdown=" (${mins}m)"
-      fi
-    fi
+# gauge <tag> <name> <pct> [resets_at]: records the glyph, and the number when it matters
+G_GLYPH=(); G_NUM=(); G_NAME=(); plain=0
+gauge() {
+  local tag=$1 name=$2 pct reset=$4 color num="" left=""
+  pct=$(printf '%.0f' "$3")
+  if   [ "$pct" -ge "$CRIT" ]; then color=$C_CRIT
+  elif [ "$pct" -ge "$WARN" ]; then color=$C_WARN
+  elif [ "$pct" -ge "$MID" ];  then color=$C_MID
+  elif [ "$pct" -ge "$LOW" ];  then color=$C_OK
+  else                              color=$C_DIM
   fi
-  five_h_str="5h:${pct_int}%${countdown}"
-fi
-
-# ---------------------------------------------------------------------------
-# 7-day (weekly) rate limit: usage% + countdown — only when on a Fable model
-# (omit if expired, absent, or not on Fable)
-# ---------------------------------------------------------------------------
-seven_d_str=""
-seven_d_pct=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
-seven_d_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
-if [ -n "$is_fable" ] && [ -n "$seven_d_pct" ]; then
-  pct7_int=$(printf "%.0f" "$seven_d_pct")
-  countdown7=""
-  if [ -n "$seven_d_reset" ]; then
-    now7=$(date +%s)
-    secs7_left=$(( seven_d_reset - now7 ))
-    if [ "$secs7_left" -gt 0 ]; then
-      days7=$(( secs7_left / 86400 ))
-      hrs7=$(( (secs7_left % 86400) / 3600 ))
-      mins7=$(( (secs7_left % 3600) / 60 ))
-      if [ "$days7" -gt 0 ]; then
-        countdown7=" (${days7}d${hrs7}h)"
-      elif [ "$hrs7" -gt 0 ]; then
-        countdown7=" (${hrs7}h${mins7}m)"
-      else
-        countdown7=" (${mins7}m)"
-      fi
-    fi
+  [ -n "$reset" ] && [ "$reset" -gt "$now" ] && left=$(( reset - now ))
+  num="${pct}"   # always shown: the colour alone was not readable
+  if [ -n "$left" ] && { [ -n "$full" ] || [ "$pct" -ge "$CRIT" ] || [ "$left" -lt 3600 ]; }; then
+    num="${pct}·$(countdown "$left")"
   fi
-  seven_d_str="7d:${pct7_int}%${countdown7}"
+  G_GLYPH+=("${C_DIM}${tag}${RESET}${color}${DOT}${RESET}")
+  G_NUM+=("${num:+${color}${num}${RESET}}")
+  G_NAME+=("$name")
+  plain=$(( plain + 3 + ${#num} ))   # " " + tag + glyph + number
+}
+
+[ -n "$ctx" ] && gauge c ctx "$ctx"
+[ -n "$h5" ]  && gauge 5 5h "$h5" "$h5r"
+if [ -n "$d7" ]; then
+  # 7-day shows on Fable models, or on any model once it reaches WARN
+  { [ -n "$is_fable" ] || [ "$(printf '%.0f' "$d7")" -ge "$WARN" ]; } && gauge 7 7d "$d7" "$d7r"
 fi
 
-# ---------------------------------------------------------------------------
-# Line 1: dir  branch*  model  ctx:%  5h:% countdown  7d:% countdown
-# Colors are pre-rendered bytes from esc(); use printf without %b.
-# ---------------------------------------------------------------------------
-# Location group: dir + optional branch/dirty (kept together, space-joined)
-loc="${C_DIR}${short_dir}${RESET}"
-if [ -n "$git_branch" ]; then
-  loc="${loc} ${C_BRANCH}${git_branch}${RESET}"
-  [ -n "$git_dirty" ] && loc="${loc}${C_DIRTY}${git_dirty}${RESET}"
-fi
+head="${loc}"; width=${#loc_plain}
+[ -n "$tag" ] && { head="${head} ${C_DIM}${tag}${RESET}"; width=$(( width + 1 + ${#tag} )); }
+# Reasoning effort, unabbreviated (low medium high xhigh max); absent when the model has none
+[ -n "$effort" ] && { head="${head} ${C_DIM}${effort}${RESET}"; width=$(( width + 1 + ${#effort} )); }
 
-# Collect the groups that are present, in order.
-segs=("$loc")
-[ -n "$model_name" ] && segs+=("${C_MODEL}${model_name}${RESET}")
-segs+=("${ctx_color}${ctx_str}${RESET}")
-[ -n "$five_h_str" ] && segs+=("${C_RATE_5H}${five_h_str}${RESET}")
-[ -n "$seven_d_str" ] && segs+=("${C_RATE_7D}${seven_d_str}${RESET}")
-
-# Join groups with the separator; within a limit group the % and its
-# countdown stay space-joined so they read as one unit.
-out="${segs[0]}"
-for i in "${segs[@]:1}"; do
-  out="${out}${SEP}${i}"
+# Numbers inline when the line fits (Claude Code indents the row by 2, keep a
+# margin); otherwise glyphs only on line one and the numbers on line two.
+inline=""; glyphs=""; detail=""
+for i in "${!G_GLYPH[@]}"; do
+  inline="${inline} ${G_GLYPH[$i]}${G_NUM[$i]}"
+  glyphs="${glyphs} ${G_GLYPH[$i]}"
+  [ -n "${G_NUM[$i]}" ] && detail="${detail} ${C_DIM}${G_NAME[$i]}${RESET} ${G_NUM[$i]}"
 done
-printf "%s\n" "$out"
+if [ -z "$detail" ] || [ $(( width + plain )) -le $(( cols - 4 )) ]; then
+  printf '%s\n' "${head}${inline}"
+else
+  printf '%s\n%s\n' "${head}${glyphs}" "${detail# }"
+fi

@@ -3,9 +3,10 @@ name: brain
 description: >
   Personal command center: Gmail, Google Calendar, and Google Tasks via the
   global `gws` CLI, plus Telegram push/receive via a BotFather bot. Use ONLY
-  when the user explicitly invokes /brain — do not activate on incidental
+  when the user explicitly invokes /brain or $brain — do not activate on incidental
   mentions of email, calendar, or tasks.
-compatibility: claude-code
+metadata:
+  compatibility: Claude Code, Codex, or OpenCode with shell access and the gws/gwsa CLIs
 allowed-tools:
   - Bash
   - Read
@@ -16,7 +17,7 @@ allowed-tools:
 
 Gmail / Calendar / Tasks through the `gws` CLI (global npm install, own token
 store — works from any directory) and a Telegram bot for push + commands.
-Full setup/bootstrap history lives in `~/.claude/skills/brain/SETUP.md`
+Full setup/bootstrap history lives in `SETUP.md` alongside this skill
 (terraform bootstrap alongside it in `terraform/`); this skill is the
 operating manual.
 
@@ -24,7 +25,7 @@ operating manual.
 
 Each Google account has its own isolated `gws` store under
 `~/.config/gws-accounts/<slot>`; use the **`gwsa` executable** (on PATH,
-works in Bash tool calls) — full docs in `~/.config/gws-accounts/README.md`:
+works in the host's shell tool) — full docs in `~/.config/gws-accounts/README.md`:
 
 ```bash
 gwsa <slot> <any gws command>   # account-scoped gws
@@ -64,8 +65,7 @@ you include that backend setting too.)
 
 - **Google**: nothing to load. `gws` reads its own encrypted store per account
   as above (independent of `gcloud`/ADC).
-- **Telegram**: env var first, else plaintext file, then trim — same pattern
-  as `~/.claude/mimo_paygo_token`:
+- **Telegram**: env var first, else plaintext file, then trim:
   ```bash
   TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-$(cat ~/.claude/telegram_bot_token)}"
   TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-$(cat ~/.claude/telegram_chat_id)}"
@@ -131,8 +131,10 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates"
   `getUpdates`. Run these without asking.
 - **Writes are gated**: anything that sends, creates, updates, or deletes —
   `+send`, `+reply`, `+insert`, `tasks ... insert`, `events ... delete/patch`,
-  Telegram `sendMessage` — requires an explicit user confirm (AskUserQuestion,
-  showing exactly what will be sent/changed) before running.
+  Telegram `sendMessage` — requires explicit user authorization covering what
+  will be sent/changed before running. Honor authorization already given in
+  the conversation; otherwise show the concrete change and ask using the
+  host's supported confirmation mechanism or a plain-text question.
 
 ## Auth recovery (recurs ~weekly)
 
@@ -163,6 +165,6 @@ wrong-account consent afterward and prints the fix.
   to the services list.
 - **Never use `gws auth setup`** — it shells out to `gcloud` and would touch
   work-account state. Manual OAuth path only; full re-bootstrap steps are in
-  `~/.claude/skills/brain/SETUP.md`.
+  `SETUP.md` alongside this skill.
 - Telegram token leak: `@BotFather → /revoke` reissues instantly; update
   `~/.claude/telegram_bot_token`.

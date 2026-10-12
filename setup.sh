@@ -55,23 +55,15 @@ GWSSHIM
 chmod 0755 "$H/.local/bin/gws"
 chown -R "$USERNAME:$USERNAME" "$H/.local"
 
-echo "=== claudex wrapper ==="
+echo "=== claudex wrapper + MiMo search bridge ==="
 install -m 0755 "$PAYLOAD/bin/claudex" /usr/local/bin/claudex
+# Stdio MCP server (Python, stdlib only). claudex adds it as mcp__mimo__web_search
+# when this file is executable; it stays idle until a MiMo key exists.
+install -m 0755 "$PAYLOAD/bin/claudex-mimo-search" /usr/local/bin/claudex-mimo-search
 
-echo "=== ~/.claude payload (search bridge, statusline) ==="
+echo "=== ~/.claude payload (statusline) ==="
 mkdir -p "$H/.claude"
-install -m 0644 "$PAYLOAD/claude/mimo-search-mcp.mjs" "$H/.claude/mimo-search-mcp.mjs"
 install -m 0755 "$PAYLOAD/claude/statusline-command.sh" "$H/.claude/statusline-command.sh"
-cat > "$H/.claude/search_mcp.json" << EOF
-{
-  "mcpServers": {
-    "mimo-search": {
-      "command": "node",
-      "args": ["$H/.claude/mimo-search-mcp.mjs"]
-    }
-  }
-}
-EOF
 chown -R "$USERNAME:$USERNAME" "$H/.claude"
 
 echo "=== agent-shared: one instruction source rendered for Claude, Codex, OpenCode ==="
@@ -81,16 +73,21 @@ echo "=== agent-shared: one instruction source rendered for Claude, Codex, OpenC
 mkdir -p "$H/.config/agent-shared/instructions"
 install -m 0644 "$PAYLOAD"/agent-shared/instructions/*.md "$H/.config/agent-shared/instructions/"
 install -m 0755 "$PAYLOAD/agent-shared/sync.py" "$H/.config/agent-shared/sync.py"
+# Generic skills versioned with sync.py (full sync.py also links them; the
+# fresh-box --instructions-only run below does not, so link them here).
+mkdir -p "$H/.config/agent-shared/skills/model-check" "$H/.claude/skills" "$H/.agents/skills"
+install -m 0644 "$PAYLOAD/agent-shared/skills/model-check/SKILL.md" "$H/.config/agent-shared/skills/model-check/SKILL.md"
+ln -sfn "$H/.config/agent-shared/skills/model-check" "$H/.claude/skills/model-check"
+ln -sfn "$H/.config/agent-shared/skills/model-check" "$H/.agents/skills/model-check"
 chown -R "$USERNAME:$USERNAME" "$H/.config/agent-shared"
 run_user "python3 $H/.config/agent-shared/sync.py --instructions-only"
-chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
+chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.agents" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
 
 echo "=== Claude Code settings (merge) ==="
 install -m 0644 "$PAYLOAD/claude/claude-settings-patch.js" /tmp/claude-settings-patch.js
 run_node "node /tmp/claude-settings-patch.js"
 rm -f /tmp/claude-settings-patch.js
 
-echo "=== Shell environment (tmux, zsh, starship) ==="
 echo "=== Shared Claude/Codex attention panel ==="
 ATTENTION_DIR="$H/.local/share/agent-attention"
 mkdir -p "$ATTENTION_DIR" "$H/.local/bin" "$H/.config/systemd/user" "$H/.claude/hooks"
@@ -111,6 +108,7 @@ if [ -S "/run/user/$ATTENTION_UID/bus" ]; then
   run_user "XDG_RUNTIME_DIR=/run/user/$ATTENTION_UID systemctl --user daemon-reload"
   run_user "XDG_RUNTIME_DIR=/run/user/$ATTENTION_UID systemctl --user restart agent-attention.service"
 fi
+echo "=== Shell environment (tmux, zsh, starship) ==="
 install -m 0644 "$PAYLOAD/home/tmux.conf" "$H/.tmux.conf"
 install -m 0644 "$PAYLOAD/home/zshenv" "$H/.zshenv"
 install -m 0644 "$PAYLOAD/home/zshrc" "$H/.zshrc"
