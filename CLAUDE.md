@@ -23,6 +23,7 @@ Remote development server provisioned with OpenTofu on Hetzner Cloud. One comman
 - `files/agent-attention/` — local Claude/Codex lifecycle observer, F12 panel, tmux include, user systemd unit, and tests. `setup.sh` installs it; no session data, credentials, or Telegram sending. See its README for state semantics and regression tests.
 - `files/devbox-guard/` — contention guard: systemd drop-ins giving `ssh`/`tailscaled` high CPU/IO weight and `MemoryMin` (plus `system.slice` `MemoryMin` so that protection is effective), sshd `Nice=-5` reset to 0 for login sessions via `limits.conf`, `io` delegated to user managers, and `devbox-iocost.service` enabling blk-iocost so `IOWeight` is enforced. The tmux server starts in the user `fleet.slice` (zshrc / hq `fleet.py up`), so every pane inherits its low weight.
 - `data-volume.sh` — mounts the Hetzner data volume (`hcloud_volume.data`, 200 GB) at `/mnt/data` (`nofail`) and moves bulky, rebuildable data onto it: `~/.cache` and `~/.npm` become symlinks (uv's hard-linked cache stays on root as `~/.uv-cache`), and `/var/lib/docker` + `/var/lib/containerd` become bind mounts. `--dry-run` prints the steps. Never move `~/dev` or the fleet worktree trash (`git worktree move` can't cross filesystems).
+- `dedicated/` — Hetzner Robot path for the dedicated `dev-box` (EX44, 2 x NVMe): `installimage.conf`, `up.sh` (install/provision/lockdown), `bootstrap.sh` (replaces cloud-init), `data-disk.sh`, `post-hq.sh`, `DESIGN.md`, `README.md`. Tailscale-only after lockdown. `tests/smoke-dedicated.sh` is its acceptance smoke.
 - `terraform.tfvars.example` — template for secrets
 
 ## Commands
@@ -35,6 +36,10 @@ tofu destroy       # tear down everything
 hcloud server list # check server status via Hetzner CLI
 hcloud server ssh dev-box # SSH via hcloud (requires hcloud context)
 ```
+
+## Dedicated (Robot) path
+
+The dedicated server `dev-box` skips OpenTofu and cloud-init: `dedicated/up.sh install|provision|lockdown <ip>` runs installimage from Robot rescue, uploads the same `files/` + `setup.sh` payload, runs `dedicated/bootstrap.sh`, then drops public SSH once Tailscale SSH works. SSH key default `~/.ssh/dev-box_ed25519` (`DEVBOX_KEY`). `setup.sh` is shared with the hcloud path. See `dedicated/README.md`.
 
 ## Post-deploy login (one-time on server)
 

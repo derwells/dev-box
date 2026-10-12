@@ -119,6 +119,33 @@ run_user "curl -LsSf https://astral.sh/uv/install.sh | sh"
 # pnpm
 run_node "npm install -g pnpm"
 
+# Codex CLI + its config. Merge only the [tui] keys: never clobber an existing file.
+run_node "npm install -g @openai/codex"
+cat > /tmp/codex-tui-patch.py << 'CODEXPATCH'
+import os, re
+path = os.path.expanduser("~/.codex/config.toml")
+os.makedirs(os.path.dirname(path), exist_ok=True)
+want = {"alternate_screen": '"never"', "fullscreen_transcript": "false"}
+lines = open(path).read().splitlines() if os.path.exists(path) else []
+hdr = next((i for i, l in enumerate(lines) if l.strip() == "[tui]"), None)
+if hdr is None:
+    lines += ([""] if lines else []) + ["[tui]"] + [f"{k} = {v}" for k, v in want.items()]
+else:
+    end = next((i for i in range(hdr + 1, len(lines)) if lines[i].lstrip().startswith("[")), len(lines))
+    for k, v in want.items():
+        for i in range(hdr + 1, end):
+            if re.match(rf"\s*{k}\s*=", lines[i]):
+                lines[i] = f"{k} = {v}"
+                break
+        else:
+            lines.insert(hdr + 1, f"{k} = {v}")
+            end += 1
+open(path, "w").write("\n".join(lines) + "\n")
+CODEXPATCH
+chmod 0644 /tmp/codex-tui-patch.py
+run_user "python3 /tmp/codex-tui-patch.py"
+rm -f /tmp/codex-tui-patch.py
+
 # oh-my-zsh (unattended; keep our own .zshrc, don't chsh here)
 if [ ! -d "$H/.oh-my-zsh" ]; then
   run_user 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
@@ -215,23 +242,38 @@ Type=forking
 User=$USERNAME
 WorkingDirectory=$H
 ExecStartPre=/bin/sh -c 'sleep 5'
-ExecStart=/usr/bin/vncserver :%i -localhost no -geometry 1920x1080 -depth 24
+ExecStart=/usr/bin/vncserver :%i -localhost yes -geometry 1920x1080 -depth 24
 ExecStop=/usr/bin/vncserver -kill :%i
 
 [Install]
 WantedBy=multi-user.target
 VNCUNIT
 
+# websockify binds the tailnet address only, never 0.0.0.0: wait for tailscale.
+cat > /usr/local/sbin/devbox-novnc << 'NOVNCWRAP'
+#!/bin/sh
+ip=
+for _ in $(seq 60); do
+  ip=$(tailscale ip -4 2>/dev/null | head -n1)
+  [ -n "$ip" ] && break
+  sleep 2
+done
+[ -n "$ip" ] || { echo "devbox-novnc: no tailscale IPv4 address" >&2; exit 1; }
+exec /usr/bin/websockify --web /usr/share/novnc "$ip:6080" localhost:5901
+NOVNCWRAP
+chmod 0755 /usr/local/sbin/devbox-novnc
+
 cat > /etc/systemd/system/novnc.service << NOVNCUNIT
 [Unit]
 Description=noVNC websocket proxy
-After=vncserver@1.service
+After=vncserver@1.service tailscaled.service
 
 [Service]
 Type=simple
 User=$USERNAME
-ExecStart=/usr/bin/websockify --web /usr/share/novnc 6080 localhost:5901
+ExecStart=/usr/local/sbin/devbox-novnc
 Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
