@@ -10,7 +10,7 @@
 #      GIT_USER_NAME / GIT_USER_EMAIL (default derwells / drckwells@gmail.com),
 #      DEVBOX_TS_HOST (Tailscale name used by lockdown, default dev-box; set to the
 #      MagicDNS FQDN or tailnet IP when a bare name resolves elsewhere),
-#      BOOTSTRAP_ALLOW_IP (only public source allowed on 22, default <dev-box-1-public-ip>),
+#      BOOTSTRAP_ALLOW_IP (required for provision: the only public source allowed on 22),
 #      FORCE_DATA_DISK=1 (pass --force-data-disk to data-disk.sh).
 set -euo pipefail
 
@@ -21,7 +21,7 @@ DEVBOX_USER="${DEVBOX_USER:-derick}"
 GIT_USER_NAME="${GIT_USER_NAME:-derwells}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-drckwells@gmail.com}"
 TS_HOST="${DEVBOX_TS_HOST:-dev-box}"
-ALLOW_IP="${BOOTSTRAP_ALLOW_IP:-<dev-box-1-public-ip>}"
+ALLOW_IP="${BOOTSTRAP_ALLOW_IP:-}"
 
 usage() { sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 2; }
 [ $# -eq 2 ] || usage
@@ -66,6 +66,7 @@ case "$PHASE" in
     ssh_root 'reboot' || true   # connection drops as the host goes down
     ;;
   provision)
+    [ -n "$ALLOW_IP" ] || { echo "up.sh: set BOOTSTRAP_ALLOW_IP to this machine's public IPv4" >&2; exit 1; }
     upload_payload
     pub=/root/.ssh/authorized_keys
     force=""; [ "${FORCE_DATA_DISK:-0}" = 1 ] && force="--force-data-disk"

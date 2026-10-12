@@ -3,6 +3,15 @@
 Agreed brief for the `hq-devbox-setup` effort. Source: `~/dev/hq/docs/briefs/hq-devbox-setup.md`
 (Derick, 2026-10-12) and `~/dev/hq/docs/reviews/devbox-upgrade-2026-10.md`.
 
+Amendment `hq-devbox-setup-7` (Derick via chief, 2026-10-12 08:4xZ, "we don't even need the working
+trees. let's just complete the stuff that's ongoing here"): **applied**; supersedes the payload part of -6
+and the porting order's steps 3-5. No rsync of repos or state. Ongoing efforts finish on dev-box-1. On
+dev-box, repos are cloned fresh from their remotes with `dedicated/clone-dev.sh` from a private manifest
+(`~/.config/dev-box/repos.tsv`, produced by `dedicated/dev-inventory.py` on dev-box-1, never committed:
+this repo is public). Remaining deliverables: bootstrap + Tailscale + lockdown + smoke; the inventory
+(what Derick must push or decide); the clone script; `dedicated/START.md` (one-page checklist including
+the "Derick moves or recreates" list). No cutover runbook or freeze window.
+
 Amendment `hq-devbox-setup-6` (Derick via chief, 2026-10-12 08:3xZ, "we just need the repos on
 there. no need to keep the existing logs"): **applied**. Migration payload is git repos under `~/dev` only:
 main checkouts (with their dirty/untracked files), worktrees only where a live effort needs one
@@ -15,7 +24,7 @@ two-filesystem layout. Supersedes the `~/.local/state/fleet` snapshot in the por
 
 Amendment `hq-devbox-setup-3` (chief on Derick's OK, 2026-10-12): **applied**, verified. dev-box-1's
 OS hostname is `dev-box-1`, `/etc/hosts` line 8 is `127.0.1.1 dev-box-1 dev-box-1`, and dev-box-1's
-`~/.ssh/config` maps `Host dev-box` to `dev-box.<tailnet>.ts.net` (user derick, key
+`~/.ssh/config` maps `Host dev-box` to the `dev-box` MagicDNS FQDN (user derick, key
 `~/.ssh/dev-box_ed25519`). So `ssh dev-box` from dev-box-1 reaches the new node once it joins;
 bootstrap must leave that key in derick's authorized_keys. Supersedes the hostname caveat in -1.
 

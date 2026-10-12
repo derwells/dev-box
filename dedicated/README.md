@@ -10,7 +10,7 @@ SSH identity: `DEVBOX_KEY` (default `~/.ssh/dev-box_ed25519`).
 
 Network-level, survives OS mistakes. Before bootstrap, in Robot → Server → Firewall:
 
-- Inbound allow TCP 22 from dev-box-1's public IP only (`<dev-box-1-public-ip>`), plus established/related.
+- Inbound allow TCP 22 from dev-box-1's public IP only, plus established/related.
 - Allow outbound; everything else inbound is dropped.
 - Delete the 22 rule after `up.sh lockdown` succeeds. Tailscale needs no inbound port.
 
@@ -25,7 +25,7 @@ dedicated/up.sh lockdown  <public-ip>   # removes public 22, sets PermitRootLogi
 ```
 
 Env knobs: `DEVBOX_USER` (default `derick`), `GIT_USER_NAME` / `GIT_USER_EMAIL`,
-`BOOTSTRAP_ALLOW_IP` (default `<dev-box-1-public-ip>`, the only public source allowed on 22),
+`BOOTSTRAP_ALLOW_IP` (required: the operator machine's public IP, the only public source allowed on 22),
 `DEVBOX_TS_HOST` (Tailscale name or FQDN used by lockdown; set it where a bare `dev-box` resolves
 to the local machine, as on dev-box-1), `FORCE_DATA_DISK=1`.
 

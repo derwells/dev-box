@@ -5,7 +5,7 @@
 # Usage: bootstrap.sh <username> <ssh_pubkey_file> [git_name] [git_email] [--force-data-disk] [--allow-ip=IP]
 #
 # Public SSH (22/tcp) is allowed in UFW only from BOOTSTRAP_ALLOW_IP (--allow-ip=IP
-# or env, default <dev-box-1-public-ip> = dev-box-1), never from anywhere. `up.sh lockdown`
+# or env; required, the operator public IP), never from anywhere. `up.sh lockdown`
 # removes it. Docker publishes on 127.0.0.1 by default and a DOCKER-USER rule drops
 # new inbound on the public interface (Docker otherwise bypasses UFW).
 #
@@ -18,7 +18,7 @@ PUBKEY_FILE="${2:?missing ssh_pubkey_file}"
 GIT_USER_NAME="${3:-derwells}"
 GIT_USER_EMAIL="${4:-drckwells@gmail.com}"
 FORCE=""
-ALLOW_IP="${BOOTSTRAP_ALLOW_IP:-<dev-box-1-public-ip>}"
+ALLOW_IP="${BOOTSTRAP_ALLOW_IP:-}"
 for a in "$@"; do
   case "$a" in
     --force-data-disk) FORCE="--force-data-disk" ;;
