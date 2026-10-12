@@ -61,7 +61,7 @@ apt-get install -y -qq \
   ca-certificates gnupg \
   ufw xfce4 xfce4-goodies dbus-x11 tigervnc-standalone-server tigervnc-common novnc websockify \
   chromium-browser git curl unzip jq tmux python3 zsh fzf bat zoxide \
-  git-delta build-essential rsync htop ncdu unattended-upgrades
+  git-delta build-essential rsync htop ncdu unattended-upgrades mosh
 
 echo "=== Docker (apt repo) ==="
 # Publish on localhost by default (set before docker first starts).
