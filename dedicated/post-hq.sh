@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # post-hq.sh — run as the user on dev-box AFTER ~/dev/hq has been copied over.
-# Installs the hq-owned pieces: fleet.slice, hygiene timers. Idempotent.
+# Installs the hq-owned pieces: fleet.slice, fleet-watch, hygiene timers. Idempotent.
 #
 # Usage: post-hq.sh [hq_dir]      (default ~/dev/hq)
 set -euo pipefail
@@ -20,6 +20,9 @@ HYGIENE=$(find_script hygiene.py)
 
 echo "=== fleet.slice (fleet.py up) ==="
 python3 "$FLEET" up
+
+echo "=== fleet-watch (state loop service) ==="
+python3 "$FLEET" service install
 
 echo "=== hygiene timers ==="
 python3 "$HYGIENE" install-timer
