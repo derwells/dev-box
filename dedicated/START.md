@@ -63,9 +63,10 @@ User units only, bound to loopback or the tailnet address.
 - [x] sieve, with its SearXNG container (`bin/sieve-searxng start`, loopback). **lead**
 - [x] `gwsa check --notify` cron (08:30), installed by `setup.sh`. Both machines ping until
   `dev-box-1` is gone. **lead**
-- [ ] fleet-watch and `fleet.slice`: `dedicated/post-hq.sh ~/dev/hq`, adapted to the port. **lead, Rust**
+- [ ] fleet-watch and `fleet.slice`: `dedicated/post-hq.sh ~/dev/hq` (builds the native `fleet`,
+  then `fleet up`, `fleet service install`, `fleet doctor`). **lead, Rust**
 - [ ] `fleet-hygiene` and `fleet-hygiene-uv` timers. Derick said on 2026-10-12 they are not needed;
-  install them only if the port keeps them. **Derick decides, Rust**
+  the port keeps them, so `post-hq.sh --hygiene` installs them if wanted. **Derick decides, Rust**
 - [ ] hqweb and `hqweb-cert.timer`: merge hq PR #118, `uv sync` in `web/server`,
   `pnpm install && pnpm build` in `web/client`, `deploy/renew-cert.sh`, copy the units from
   `web/server/deploy/`, then enable them. **lead, Rust.** Afterwards, reinstall the phone app from

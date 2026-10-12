@@ -293,7 +293,7 @@ systemctl daemon-reload
 # box (2026-10-06 stall). High CPU/IO weight + MemoryMin for both, Nice for
 # sshd (reset to 0 in login sessions by limits.conf), io delegated to user
 # managers so fleet.slice's IOWeight applies, and blk-iocost so IOWeight is
-# enforced at all. fleet.slice itself is installed by hq's `fleet.py up`.
+# enforced at all. fleet.slice itself is installed by hq's `fleet up`.
 G="$PAYLOAD/devbox-guard"
 for u in ssh.service tailscaled.service system.slice user@.service; do
   install -D -m 0644 "$G/$u.conf" "/etc/systemd/system/$u.d/90-devbox-guard.conf"

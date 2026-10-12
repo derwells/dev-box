@@ -91,8 +91,12 @@ systemctl is-active devbox-iocost.service >/dev/null 2>&1 && pass "devbox-iocost
 defer() { echo "DEFER $* (deferred: rust port)"; }
 if [ "${SMOKE_FLEET:-0}" = 1 ]; then
   if systemctl --user cat fleet.slice >/dev/null 2>&1; then pass "fleet.slice present"; else fail "fleet.slice missing (run post-hq.sh)"; fi
-  systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygiene' && pass "fleet-hygiene timer present" || fail "fleet-hygiene timer missing (run post-hq.sh)"
-  systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygiene-uv' && pass "fleet-hygiene-uv timer present" || fail "fleet-hygiene-uv timer missing (run post-hq.sh)"
+  command -v fleet >/dev/null 2>&1 && pass "fleet: native binary on PATH" || fail "fleet binary missing (run post-hq.sh)"
+  systemctl --user is-active 'fleet-watch@*' >/dev/null 2>&1 && pass "fleet-watch active" || fail "fleet-watch not active (run post-hq.sh)"
+  # Hygiene timers are optional (post-hq.sh --hygiene).
+  for t in fleet-hygiene fleet-hygiene-uv; do
+    systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q " $t.timer" && pass "$t timer present" || echo "SKIP  $t timer (optional: post-hq.sh --hygiene)"
+  done
 else
   defer "fleet.slice"; defer "fleet-hygiene timer"; defer "fleet-hygiene-uv timer"
 fi

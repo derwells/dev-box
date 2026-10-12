@@ -60,8 +60,9 @@ plus Docker, gh, Tailscale. It never runs `tailscale up` non-interactively; it p
 `[tui] alternate_screen = "never"` merged without clobbering; noVNC binds the tailnet address, not
 0.0.0.0.
 
-**Not in this repo.** The private hq repo installs `fleet.slice` and the hygiene timers after it is
-cloned; `post-hq.sh` runs those installers.
+**Not in this repo.** The private hq repo owns fleet. `post-hq.sh` builds the native `fleet` from
+hq's `fleet-rs` (Cargo target on `/data`), then runs `fleet up` and `fleet service install`; the
+hygiene timers are opt-in (`--hygiene`).
 
 **Tailscale-only security.** Nothing on the public IP accepts connections after lockdown.
 1. Robot firewall (set by hand): inbound TCP 22 from the operator IP during bootstrap only.
