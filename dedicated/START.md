@@ -1,7 +1,9 @@
 # Switch over to dev-box
 
 The order to follow when moving from `dev-box-1` to `dev-box`, as of 2026-10-12. Each item shows who
-does it (**lead** or **Derick**) and when: **now**, or **Rust** (after the Rust port of fleet lands).
+does it (**lead** or **Derick**) and when: **now**, or **move** (after the chief confirms fleet's
+clean day on `dev-box-1` passed, around 2026-10-13 19:10Z). Fleet is the native binary only; no
+`fleet.py` anywhere.
 `[x]` means done and verified. No logs, session history, fleet state or Docker volumes move. Repos
 are cloned fresh. Secrets, manifests and `.env` files never enter this repo.
 
@@ -34,7 +36,7 @@ put a value on `dev-box`. Values that already exist are copied file to file, und
 - [x] Per-repo `.env` files for every cloned repo where git ignores `.env` (one repo tracks its own).
   Repos with no remote are not cloned, so their `.env` waits on the push list. **lead**
 - [ ] aide Discord token (`~/.config/aide/discord_token`) and `~/.config/aide/config.toml`: copy when
-  aide moves (section 4). **lead, Rust**
+  aide moves (section 4). **lead, move**
 - [ ] Notion MCP: authorize it with `/mcp` inside `claude`. **Derick, now**
 - [ ] Optional: `vncpasswd` for noVNC. **Derick, now**
 
@@ -49,9 +51,8 @@ put a value on `dev-box`. Values that already exist are copied file to file, und
 - [x] `setup.sh` re-run with this branch, so `files/` (claudex search, model-check, shared
   instructions) matches the repo. **lead**
 - [ ] hq-owned skills (`chief`, `lead`, `dispatch`, `advise`, `research-fanout`, `discord-catchup`),
-  Claude fleet hooks (`readonly_approve`, `delegation_guard`), Codex `hooks.json` and the
-  `{low,medium,high}.config.toml` profiles. They call fleet, and the port changes their paths.
-  **lead, Rust**
+  the Codex `{low,medium,high}.config.toml` profiles. The fleet hooks come from
+  `fleet delegation install --native` (section 4). **lead, move**
 - [ ] Optional: the Android binder module, needed only for Android emulator work:
   `apt install linux-modules-extra-$(uname -r)`, `modprobe binder_linux`, then persist it in
   `/etc/modules-load.d/`. **lead, now on request**
@@ -63,18 +64,22 @@ User units only, bound to loopback or the tailnet address.
 - [x] sieve, with its SearXNG container (`bin/sieve-searxng start`, loopback). **lead**
 - [x] `gwsa check --notify` cron (08:30), installed by `setup.sh`. Both machines ping until
   `dev-box-1` is gone. **lead**
-- [ ] fleet-watch and `fleet.slice`: `dedicated/post-hq.sh ~/dev/hq` (builds the native `fleet`,
-  then `fleet up`, `fleet service install`, `fleet doctor`). **lead, Rust**
+- [ ] Fleet binary, fleet-watch and delegation hooks: `dedicated/post-hq.sh ~/dev/hq` with hq on
+  `main`. It builds `fleet-rs` with `CARGO_TARGET_DIR=/data/home/$USER/cargo-target/hq`
+  (`cargo build --release --locked -p fleet`), installs `~/.local/bin/fleet`, then runs
+  `fleet service install`, `fleet delegation install --native` and `fleet doctor`. `~/.local/bin`
+  is on the login PATH, so the tmux server and its hooks find plain `fleet`. A trial build from hq
+  `35af674` matched the reference sha256 (`3461d59c…`) and was uninstalled again. **lead, move**
 - [ ] `fleet-hygiene` and `fleet-hygiene-uv` timers. Derick said on 2026-10-12 they are not needed;
-  the port keeps them, so `post-hq.sh --hygiene` installs them if wanted. **Derick decides, Rust**
+  the port keeps them, so `post-hq.sh --hygiene` installs them if wanted. **Derick decides, move**
 - [ ] hqweb and `hqweb-cert.timer`: merge hq PR #118, `uv sync` in `web/server`,
   `pnpm install && pnpm build` in `web/client`, `deploy/renew-cert.sh`, copy the units from
-  `web/server/deploy/`, then enable them. **lead, Rust.** Afterwards, reinstall the phone app from
+  `web/server/deploy/`, then enable them. **lead, move.** Afterwards, reinstall the phone app from
   the new address (push subscriptions are per address). **Derick**
 - [ ] aide: run `aide/install.sh`, copy the token and config (section 2), stop it on `dev-box-1`,
-  then enable it on `dev-box`. Never run both, because they would post twice. **lead, Rust**
+  then enable it on `dev-box`. Never run both, because they would post twice. **lead, move**
 - [ ] alpha-mill daily timer: it sends a fleet `say`, so its effort recreates it once fleet runs.
-  **lead, Rust**
+  **lead, move**
 - [ ] The nightly Fly backup timer (`*-fly-backup`): needs `flyctl` (**lead**) and `fly auth login`
   (**Derick**). Keep it only if that app's backups still matter, since its bot is not moving.
   **Derick decides, now**
@@ -91,7 +96,8 @@ User units only, bound to loopback or the tailnet address.
 
 ## 6. Chief
 
-- [ ] Start a fresh chief on `dev-box` with the ported fleet. No fleet state is copied. **Derick, Rust**
+- [ ] Start a fresh chief on `dev-box`: `fleet up` (it also writes `fleet.slice`). No fleet state
+  is copied. Then run the smoke with `SMOKE_FLEET=1`. **Derick, move**
 
 ## 7. Kill week for dev-box-1
 

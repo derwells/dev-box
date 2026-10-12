@@ -7,6 +7,10 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-14` (2026-10-12): applied. Fleet on `dev-box` is the native binary only, built
+  from hq `main` (`post-hq.sh`); no `fleet.py`. The move waits for the chief to confirm the clean day
+  (around 2026-10-13 19:10Z). A trial build from `35af674` matched the reference sha256 and was
+  uninstalled again; nothing fleet runs on `dev-box`.
 - `hq-devbox-setup-13` (2026-10-12): applied. `START.md` is now the ordered switchover checklist
   (owner, now or Rust, done marks). Done now: live static secrets copied file to file (aide Paste
   writes only on the aide host, `dev-box-1`, so no Paste requests were needed), Claude/Codex
@@ -61,8 +65,9 @@ plus Docker, gh, Tailscale. It never runs `tailscale up` non-interactively; it p
 0.0.0.0.
 
 **Not in this repo.** The private hq repo owns fleet. `post-hq.sh` builds the native `fleet` from
-hq's `fleet-rs` (Cargo target on `/data`), then runs `fleet up` and `fleet service install`; the
-hygiene timers are opt-in (`--hygiene`).
+hq's `fleet-rs` (Cargo target on `/data`), then runs `fleet service install` and
+`fleet delegation install --native`; `fleet up` starts the chief and is a separate step. The hygiene
+timers are opt-in (`--hygiene`).
 
 **Tailscale-only security.** Nothing on the public IP accepts connections after lockdown.
 1. Robot firewall (set by hand): inbound TCP 22 from the operator IP during bootstrap only.

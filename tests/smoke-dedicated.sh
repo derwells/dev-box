@@ -86,11 +86,11 @@ for u in ssh tailscaled; do
   [ -f "/etc/systemd/system/$u.service.d/90-devbox-guard.conf" ] && pass "devbox-guard drop-in: $u" || fail "devbox-guard drop-in missing: $u"
 done
 systemctl is-active devbox-iocost.service >/dev/null 2>&1 && pass "devbox-iocost active" || fail "devbox-iocost not active"
-# Fleet tooling waits for the Rust port of hq's fleet (amend hq-devbox-setup-12).
-# SMOKE_FLEET=1 turns these back into real checks once post-hq.sh has run.
-defer() { echo "DEFER $* (deferred: rust port)"; }
+# Fleet waits for the move (amends hq-devbox-setup-12, -14).
+# SMOKE_FLEET=1 turns these into real checks after post-hq.sh and `fleet up`.
+defer() { echo "DEFER $* (deferred: fleet move)"; }
 if [ "${SMOKE_FLEET:-0}" = 1 ]; then
-  if systemctl --user cat fleet.slice >/dev/null 2>&1; then pass "fleet.slice present"; else fail "fleet.slice missing (run post-hq.sh)"; fi
+  if systemctl --user cat fleet.slice >/dev/null 2>&1; then pass "fleet.slice present"; else fail "fleet.slice missing (run fleet up)"; fi
   command -v fleet >/dev/null 2>&1 && pass "fleet: native binary on PATH" || fail "fleet binary missing (run post-hq.sh)"
   systemctl --user list-units 'fleet-watch@*' --state=active --no-legend 2>/dev/null | grep -q . && pass "fleet-watch active" || fail "fleet-watch not active (run post-hq.sh)"
   # Hygiene timers are optional (post-hq.sh --hygiene).

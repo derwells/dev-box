@@ -41,10 +41,10 @@ to the local machine, as on dev-box-1), `FORCE_DATA_DISK=1`.
   there, docker/containerd bind mounts, 16G `/swapfile`. `--dry-run` prints the steps. It derives
   the root disk from `findmnt /`, never touches it, and refuses a disk that already has a partition
   table or filesystem unless `--force-data-disk`.
-- `post-hq.sh`: run as the user after `~/dev/hq` is cloned and fleet's Rust port has landed; builds
-  the native `fleet` from hq's `fleet-rs` into `~/.local/bin`, then runs `fleet up` (once Claude is
-  logged in), `fleet service install` and `fleet doctor`. `--hygiene` also installs the two hygiene
-  timers.
+- `post-hq.sh`: run as the user after `~/dev/hq` is cloned (on `main`); builds the native `fleet`
+  from hq's `fleet-rs` into `~/.local/bin`, then runs `fleet service install`,
+  `fleet delegation install --native` and `fleet doctor`. `fleet up` (the chief) is a separate step.
+  `--hygiene` also installs the two hygiene timers.
 
 ## Security: Tailscale-only
 
