@@ -44,7 +44,9 @@ is committed to this repo: secrets, manifests and `.env` files stay private.
 - [ ] Repos the inventory marks as having no remote are not in the manifest: push them to a new
   private remote from `dev-box-1` first, or decide to leave them behind.
 
-## c) hq and fleet
+## c) hq and fleet (deferred until the Rust port of fleet lands)
+
+Do not install or run fleet on `dev-box` yet. When the port is ready:
 
 - [ ] `~/dev/dev-box/dedicated/post-hq.sh ~/dev/hq`: installs `fleet.slice` and the hygiene timers
   (runs `fleet.py up`); fleet state starts fresh.

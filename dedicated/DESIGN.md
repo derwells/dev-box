@@ -7,6 +7,15 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-12` (2026-10-12): applied. Order: update all repos first (push the safe
+  ones from `dev-box-1`, list the rest for Derick), then clone and verify on `dev-box`. Do not install or
+  run fleet on `dev-box` until hq's Rust port lands; smoke reports those checks as `DEFER`. Supersedes
+  the fleet part of -11 (fleet units, hygiene timers and hqweb were removed from `dev-box`).
+- `hq-devbox-setup-11` (2026-10-12): applied. gh, Claude and Codex logged in on `dev-box`.
+- `hq-devbox-setup-10` (2026-10-12): applied. `gws` on PATH for non-interactive shells; smoke checks
+  `gws` and the four `gwsa` slots.
+- Derick, 2026-10-12: agents may copy static secret files between his machines, without reading or
+  printing them (supersedes the brief's "Derick transfers secrets himself"); the sieve key was copied.
 - `hq-devbox-setup-7` (2026-10-12): applied. No rsync of repos or state; ongoing work finishes on
   `dev-box-1`. On `dev-box`, repos are cloned fresh from their remotes by `clone-dev.sh` from a
   private manifest (`~/.config/dev-box/repos.tsv`, made by `dev-inventory.py`, never committed).

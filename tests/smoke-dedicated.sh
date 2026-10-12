@@ -86,9 +86,16 @@ for u in ssh tailscaled; do
   [ -f "/etc/systemd/system/$u.service.d/90-devbox-guard.conf" ] && pass "devbox-guard drop-in: $u" || fail "devbox-guard drop-in missing: $u"
 done
 systemctl is-active devbox-iocost.service >/dev/null 2>&1 && pass "devbox-iocost active" || fail "devbox-iocost not active"
-if systemctl --user cat fleet.slice >/dev/null 2>&1; then pass "fleet.slice present"; else fail "fleet.slice missing (run post-hq.sh)"; fi
-systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygiene' && pass "fleet-hygiene timer present" || fail "fleet-hygiene timer missing (run post-hq.sh)"
-systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygiene-uv' && pass "fleet-hygiene-uv timer present" || fail "fleet-hygiene-uv timer missing (run post-hq.sh)"
+# Fleet tooling waits for the Rust port of hq's fleet (amend hq-devbox-setup-12).
+# SMOKE_FLEET=1 turns these back into real checks once post-hq.sh has run.
+defer() { echo "DEFER $* (deferred: rust port)"; }
+if [ "${SMOKE_FLEET:-0}" = 1 ]; then
+  if systemctl --user cat fleet.slice >/dev/null 2>&1; then pass "fleet.slice present"; else fail "fleet.slice missing (run post-hq.sh)"; fi
+  systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygiene' && pass "fleet-hygiene timer present" || fail "fleet-hygiene timer missing (run post-hq.sh)"
+  systemctl --user list-timers --all --no-pager 2>/dev/null | grep -q 'fleet-hygiene-uv' && pass "fleet-hygiene-uv timer present" || fail "fleet-hygiene-uv timer missing (run post-hq.sh)"
+else
+  defer "fleet.slice"; defer "fleet-hygiene timer"; defer "fleet-hygiene-uv timer"
+fi
 
 # --- tools
 for t in claude codex uv pnpm gh tmux node docker; do
