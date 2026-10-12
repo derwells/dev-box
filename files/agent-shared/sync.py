@@ -9,12 +9,24 @@ import sys
 ROOT = Path(__file__).resolve().parent
 USER_DIR = ROOT.parents[1]
 SKILLS = ('ai-image', 'brain', 'claudex', 'handoff', 'humanizer',
-          'learn', 'make-film', 'spell-out')
+          'learn', 'make-film', 'model-check', 'spell-out')
+# Skills whose source lives in this repo's skills/ rather than ~/.claude/skills.
+LOCAL_SKILLS = ('model-check',)
 TARGETS = {
     'claude': USER_DIR / '.claude/CLAUDE.md',
     'codex': USER_DIR / '.codex/AGENTS.md',
     'opencode': USER_DIR / '.config/opencode/AGENTS.md',
 }
+
+def skill_links(skills):
+    """Yield (link, source) pairs; local skills are also linked into ~/.claude/skills."""
+    for name in skills:
+        if name in LOCAL_SKILLS:
+            source = ROOT / 'skills' / name
+            yield USER_DIR / f'.claude/skills/{name}', source
+        else:
+            source = USER_DIR / f'.claude/skills/{name}'
+        yield USER_DIR / f'.agents/skills/{name}', source
 
 def rendered_files(skills=SKILLS):
     common = (ROOT / 'instructions/common.md').read_text()
@@ -43,11 +55,9 @@ def main():
     args = parser.parse_args()
     skills = () if args.instructions_only else SKILLS
     # Validate all link targets before making changes.
-    for name in skills:
-        if not (USER_DIR / f'.claude/skills/{name}/SKILL.md').is_file():
-            raise SystemExit(f'Missing skill: {name}')
-        link = USER_DIR / f'.agents/skills/{name}'
-        source = USER_DIR / f'.claude/skills/{name}'
+    for link, source in skill_links(skills):
+        if not (source / 'SKILL.md').is_file():
+            raise SystemExit(f'Missing skill: {source}')
         if (link.exists() or link.is_symlink()) and link.resolve() != source.resolve():
             raise SystemExit(f'Refusing to replace unrelated skill: {link}')
     mismatches = []
@@ -68,20 +78,19 @@ def main():
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         print(f'Wrote {target}')
-    for name in skills:
-        link = USER_DIR / f'.agents/skills/{name}'
+    for link, source in skill_links(skills):
         if link.exists():
             continue
         mismatches.append(str(link))
         if not args.check:
             link.parent.mkdir(parents=True, exist_ok=True)
-            link.symlink_to(USER_DIR / f'.claude/skills/{name}', target_is_directory=True)
+            link.symlink_to(source, target_is_directory=True)
             print(f'Linked {link}')
     if args.check:
         if mismatches:
             print('Out of sync:\n' + '\n'.join(mismatches))
             return 1
-        print('Instructions, command wrappers, and nine shared skill links are in sync.')
+        print(f'Instructions, command wrappers, and {len(skills)} shared skills are in sync.')
     return 0
 
 if __name__ == '__main__':

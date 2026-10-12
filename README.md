@@ -1,164 +1,104 @@
 # Dev Box
 
-Remote development server for Claude Code, accessible via Tailscale SSH from laptop and phone. Includes a desktop environment for visual verification via noVNC in a browser.
+Remote development server for coding agents (Claude Code, Codex), reached over Tailscale from a
+laptop or phone. A desktop session is available through noVNC for visual checks.
 
-Provisioned with OpenTofu on Hetzner Cloud. One command to create, one to destroy.
+**This repository is public.** It holds no secrets, tokens, IPs or tailnet names; those live in
+gitignored files or on the box. `tests/check-public.sh` enforces that.
 
-## Stack
+## Two paths
+
+| Path | Server | Status |
+|------|--------|--------|
+| **Dedicated (Robot)** | Hetzner EX44-1-LTD (i5-13500, 64 GB, 2 x 512 GB NVMe), `dev-box` | Primary. Tailscale-only after lockdown. See [`dedicated/README.md`](dedicated/README.md), [`dedicated/START.md`](dedicated/START.md), [`dedicated/DESIGN.md`](dedicated/DESIGN.md). |
+| **hcloud (legacy)** | Cloud VM `dev-box-1`, provisioned with OpenTofu | Legacy, removed once dev-box-1 is retired (October 2026). Until the server is destroyed, leave `main.tf`, `variables.tf`, `outputs.tf`, `cloud-init.yaml.tftpl`, `terraform.tfvars.example` and `data-volume.sh` in place. |
+
+Both paths upload the same `files/` payload and run the same `setup.sh`.
+
+## What gets installed
 
 ```
-Hetzner CPX31 (4 vCPU, 8GB RAM, ~$12/mo)
 Ubuntu Server 24.04
-├── Tailscale          — private mesh networking, no public ports
+├── Tailscale          — private mesh; OpenSSH over the tailnet (no `--ssh`), no public ports after lockdown
 ├── Claude Code        — native installer (~/.local/bin)
 │   ├── Superpowers    — plugin (official marketplace)
 │   ├── Context7       — plugin (official marketplace)
-│   └── Humanizer      — writing skill
+│   ├── Humanizer      — writing skill
+│   └── skills         — claudex, brain, model-check
+├── claudex            — Claude Code on Xiaomi MiMo, plus a MiMo web-search MCP bridge
 ├── gws + gwsa         — Google Workspace CLI, one credential slot per account
-├── zsh + oh-my-zsh    — default login shell, mirrors the local WSL config
-│   ├── Starship       — prompt (Catppuccin Latte)
-│   ├── fzf/zoxide/bat — Ctrl+R, `z`, syntax-highlighted `cat`
-│   ├── uv, pnpm, fnm  — Python + Node toolchains
-│   └── tmux           — auto-attaches to session "main" on login
-├── GitHub CLI         — gh auth, PRs, issues
-├── Playwright         — headless browser for automated screenshots
-├── XFCE4             — lightweight desktop (~200MB)
-├── TigerVNC          — serves the desktop session
-├── noVNC             — web-based VNC client (browser tab on laptop/phone)
-└── Chromium          — for manual visual verification
+├── agent-shared       — one instruction source rendered for Claude, Codex and OpenCode
+├── agent-attention    — Claude/Codex status panel in tmux (F12)
+├── devbox-guard       — keeps ssh and tailscaled responsive under load
+├── zsh + oh-my-zsh    — login shell with Starship, fzf, zoxide, bat, delta, uv, pnpm, fnm
+├── tmux               — auto-attaches on login
+├── GitHub CLI, Playwright
+└── XFCE4 + TigerVNC + noVNC — desktop in a browser tab, bound to the tailnet address
 ```
 
-## Dedicated (Robot) path
+The dedicated path adds Docker, Codex CLI, a second-disk `/data` layout and a 16 GiB swapfile
+(see `dedicated/`).
 
-A second path provisions a Hetzner Robot dedicated server (named `dev-box`) with
-`installimage` instead of OpenTofu/cloud-init, reusing `files/` and `setup.sh`. It ends
-Tailscale-only. See [`dedicated/README.md`](dedicated/README.md).
-
-## Prerequisites
-
-- [OpenTofu](https://opentofu.org/docs/intro/install/) installed locally
-- [Hetzner CLI](https://github.com/hetznercloud/cli) (`hcloud`) for server management
-- A [Hetzner Cloud](https://console.hetzner.cloud) account with an API token
-- [Tailscale](https://tailscale.com) account (free for personal use)
-- An SSH key pair (`~/.ssh/id_ed25519` by default)
-
-## Setup
-
-### 1. Create your config
+## Dedicated path (summary)
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars
+dedicated/up.sh install   <public-ip>   # from Robot rescue: installimage + reboot
+dedicated/up.sh provision <public-ip>   # bootstrap.sh, then setup.sh
+# on the box: tailscale up --hostname dev-box   (approve the node)
+dedicated/up.sh lockdown  <public-ip>   # drop public 22 once tailnet SSH works
 ```
 
-Edit `terraform.tfvars` with:
-- Your Hetzner API token (create at Hetzner Console → Security → API Tokens)
-- Optionally, a [Tailscale auth key](https://login.tailscale.com/admin/settings/keys) for automatic device registration
+Then follow [`dedicated/START.md`](dedicated/START.md) (logins, Google slots, cloning `~/dev`).
+Run `tests/smoke-dedicated.sh` on the box to verify.
 
-### 2. Set up Hetzner CLI
+## hcloud path (legacy, removed once dev-box-1 is retired, October 2026)
+
+OpenTofu + cloud-init for the Cloud VM `dev-box-1`: `cp terraform.tfvars.example terraform.tfvars`,
+then `tofu init && tofu apply`. Cloud-init bootstraps; OpenTofu then uploads `files/` and runs
+`setup.sh`, which can be re-run by hand as root. These files are deleted after the server is
+destroyed; nothing new should depend on them.
+
+## Post-install logins (one-time)
 
 ```bash
-hcloud context create dev-box    # paste your Hetzner API token when prompted
+gh auth login      # GitHub (skipped if github_token was set in tfvars on the hcloud path)
+claude login       # Claude Code (headless URL flow)
+codex login        # dedicated path only
 ```
 
-### 3. Deploy
+### Optional: `claudex` (Claude Code on Xiaomi MiMo)
+
+`claudex` runs the same Claude Code binary against MiMo's token-plan endpoint. Everything,
+including subagents, runs on `mimo-v2.6-flash` unless a run asks for the high tier with
+`--model opus|fable` (or `CLAUDEX_MODEL=mimo-v2.6-pro`). Plain `claude` is unaffected.
+
+Add your token-plan key once, never to tfvars or the repo:
 
 ```bash
-tofu init
-tofu apply
+echo "<plan-token>" > ~/.claude/mimo_token && chmod 600 ~/.claude/mimo_token
+claudex                       # interactive
+claudex -p "..."              # headless
 ```
 
-This creates the server in two stages: cloud-init bootstraps it (user, packages, Tailscale,
-firewall), then OpenTofu uploads `files/` + `setup.sh` over SSH and runs the script to install
-everything else. The split exists because Hetzner hard-caps cloud-init `user_data` at 32KiB and
-the full payload is far larger. Takes ~10 minutes. The provisioners connect as root with
-`ssh_private_key_path` (default `~/.ssh/id_ed25519`).
-
-If `setup.sh` fails partway (e.g. a flaky download), it's safe to re-run by hand:
+`MIMO_API_KEY` in the environment overrides the file. **Plan ran out?** Fall back to pay-as-you-go:
 
 ```bash
-ssh root@<public-ip> 'bash /root/setup.sh <username> "<git name>" <git email>'
+claudex --paygo -p "..."                    # one run
+echo paygo > ~/.claude/claudex_backend      # persistent (echo plan, or delete the file, to undo)
 ```
 
-### 4. Post-deploy (one-time)
+The PAYG key comes from `MIMO_PAYGO_KEY` or `~/.claude/mimo_paygo_token`. Precedence is flag >
+`~/.claude/claudex_backend`; with no plan token, `claudex` uses PAYG automatically.
 
-SSH into the server:
+**Web search.** Claude Code's built-in `WebSearch` is Anthropic-only, so `claudex` denies it and,
+when `/usr/local/bin/claudex-mimo-search` is present (installed by `setup.sh`), adds it as the MCP
+tool `mcp__mimo__web_search`. The bridge calls MiMo's search over the OpenAI-compatible protocol,
+tries the token plan first and then PAYG, and is billed per search. `CLAUDEX_SEARCH=0` leaves it out.
 
-```bash
-ssh <username>@<public-ip>    # from tofu output
-```
-
-If you didn't provide a Tailscale auth key:
-
-```bash
-sudo tailscale up --ssh
-```
-
-Approve the device in the [Tailscale admin console](https://login.tailscale.com/admin/machines).
-
-Log in to services (each gives you a URL to open in any browser):
-
-```bash
-gh auth login                 # GitHub — clone, push, PRs
-claude login                  # Claude Code — AI assistant (Anthropic)
-```
-
-#### Optional: `claudex` (Claude Code routed to Xiaomi MiMo)
-
-`claudex` runs the same Claude Code binary against Xiaomi MiMo's token-plan endpoint, with this
-tier mapping: Sonnet/Haiku (and the session default) → `mimo-v2.5` for cheap fan-out;
-`--model opus` / `--model fable` → `mimo-v2.5-pro` for runs that explicitly ask for the high
-tier. Plain `claude` is unaffected.
-
-Add your token-plan key once (looks like `tp-...`):
-
-```bash
-echo "tp-xxxxx" > ~/.claude/mimo_token && chmod 600 ~/.claude/mimo_token
-```
-
-Then:
-
-```bash
-claudex                       # interactive -> mimo-v2.5
-claudex -p "..."              # headless (fan-out runs also stay on mimo-v2.5)
-```
-
-A `MIMO_API_KEY` in the environment overrides the file.
-
-**Token plan ran out?** `claudex` can fall back to MiMo's pay-as-you-go API
-(`https://api.xiaomimimo.com/anthropic`), billed from account balance. It reuses the same
-`sk-...` key as the search bridge below (`MIMO_PAYGO_KEY` env or `~/.claude/mimo_paygo_token`):
-
-```bash
-claudex --paygo -p "..."                    # one run on PAYG
-echo paygo > ~/.claude/claudex_backend      # every run on PAYG until you switch back
-echo plan  > ~/.claude/claudex_backend      # back to the token plan (or just delete the file)
-```
-
-`CLAUDEX_BACKEND=paygo|plan` in the environment also works (flag > env > file). If there's no
-token-plan token at all but a PAYG key exists, `claudex` falls back to PAYG automatically.
-
-**Web search (optional, pay-as-you-go).** Claude Code's built-in `WebSearch` is server-side and
-Anthropic-only, so it doesn't work through MiMo. `claudex` instead routes search through a small
-MCP bridge (`~/.claude/mimo-search-mcp.mjs`, wired via `~/.claude/search_mcp.json`) that calls
-MiMo's web-search plugin. This is **not** covered by the token plan — it needs a separate
-pay-as-you-go key (`sk-...`) with account balance (~$5 per 1,000 searches + tokens) and the
-web-search plugin enabled in the [MiMo console](https://platform.xiaomimimo.com/#/console/plugin):
-
-```bash
-echo "sk-xxxxx" > ~/.claude/mimo_paygo_token && chmod 600 ~/.claude/mimo_paygo_token
-```
-
-Once the key is present, `claudex` auto-loads the bridge and disables the dead built-in
-`WebSearch`; the model calls `web_search` and gets grounded answers with source URLs. Model
-traffic stays on the token plan — only search hits the pay-as-you-go balance. Without the key,
-`claudex` still works for everything else.
-
-**`/claudex` skill.** The box also ships a `claudex` skill (`~/.claude/skills/claudex/SKILL.md`)
-that teaches your main `claude` session to offload broad "read a lot, return a little" research —
-codebase surveys, docs sweeps, finding every call site — to headless `claudex -p` runs. Fan-out
-reading then burns the cheap MiMo plan instead of your main Anthropic context and quota. It's
-gather-only: `claudex` reports with `file:line` evidence, and your main agent makes the decisions
-and does the edits.
+**`/claudex` skill.** `~/.claude/skills/claudex/SKILL.md` teaches your main `claude` session to
+offload broad "read a lot, return a little" research to headless `claudex -p` runs, so fan-out
+reading burns the MiMo plan instead of your main quota. It is gather-only: claudex reports, the
+main agent decides and edits.
 
 #### Optional: `/brain` (personal command center)
 
@@ -204,21 +144,24 @@ behind an explicit confirmation. Keep the OAuth consent screen in **Testing** mo
 tokens then expire ~weekly — `gwsa login <slot>` revives a slot in ~30s); the skill documents
 the recovery flow, including the Tailscale localhost-callback gotcha.
 
-Set a VNC password and start the desktop:
+### Optional: VNC desktop
 
 ```bash
 vncpasswd                     # set password, say "no" to view-only
 sudo systemctl enable --now vncserver@1 novnc
 ```
 
-### 5. Connect
+noVNC listens on the tailnet address only, port 6080.
 
-Add to `~/.ssh/config` on your laptop:
+## Connecting
+
+Use plain OpenSSH over the tailnet. In `~/.ssh/config` on your laptop:
 
 ```
 Host dev-box
     HostName <tailscale-ip-or-hostname>
     User <username>
+    IdentityFile ~/.ssh/dev-box_ed25519
     ForwardAgent yes
 ```
 
@@ -227,17 +170,15 @@ Host dev-box
 | Laptop | `ssh dev-box`                           | Claude Code, terminal work    |
 | Laptop | `http://<tailscale-ip>:6080` in browser | Visual verification, browsing |
 | Phone  | SSH app via Tailscale                   | Quick checks, monitoring      |
-| Phone  | `http://<tailscale-ip>:6080` in browser | Visual verification           |
 
 ## Shell environment
 
-The box provisions the same interactive setup as the local WSL machine, so `ssh dev-box` lands you
-in a familiar shell:
+`ssh dev-box` lands you in a ready interactive shell:
 
 - **zsh** is the login shell, with oh-my-zsh (`git` plugin) and a **Starship** prompt using the
   Catppuccin Latte palette (`~/.config/starship.toml`).
-- **tmux** auto-attaches to a session named `main` (creating it if needed) on every interactive
-  login, so disconnects never lose work. Config is `~/.tmux.conf` — mouse on, 1-indexed windows,
+- **tmux** auto-attaches to a session named `fleet` if one exists, else `main` (created if
+  needed), on every interactive login, so disconnects never lose work. Config is `~/.tmux.conf` — mouse on, 1-indexed windows,
   `|`/`-` splits, and a shared **Claude Code + Codex attention panel** on F12. Green means
   ready, amber needs input, blue working; completion waits for tracked sub-agents and active
   Codex goals. Tap either line to open its exact pane and mark the alert read; READY stays
@@ -252,22 +193,6 @@ in a familiar shell:
 - Git identity comes from the `git_user_name` / `git_user_email` variables (defaults in
   `variables.tf`; override in `terraform.tfvars`).
 
-WSL-only pieces of the local config — the adb/`WSL_HOST_IP` bridge, Edge as `$BROWSER`, deno,
-opencode, flyctl — are deliberately left out.
-
-## Server Management
-
-```bash
-hcloud server list              # check status
-hcloud server ssh dev-box       # SSH via hcloud
-hcloud server reboot dev-box    # reboot
-tofu destroy                    # tear down everything
-```
-
 ## Costs
 
-| Item          | Cost        |
-|---------------|-------------|
-| Hetzner CPX31 | ~$12/mo     |
-| Tailscale     | Free        |
-| **Total**     | **~$12/mo** |
+Dedicated: the Hetzner EX44 monthly fee (see Hetzner's current pricing). Tailscale is free for personal use.
