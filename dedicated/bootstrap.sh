@@ -54,6 +54,9 @@ done < "$PUBKEY_FILE"
 chown "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh/authorized_keys"
 chmod 0600 "/home/$USERNAME/.ssh/authorized_keys"
 
+# User services (fleet-watch, hqweb, sieve, hygiene timers) must outlive ssh sessions.
+loginctl enable-linger "$USERNAME"
+
 echo "=== apt packages ==="
 apt-get update -qq
 apt-get upgrade -y -qq
