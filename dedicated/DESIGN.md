@@ -3,6 +3,9 @@
 Agreed brief for the `hq-devbox-setup` effort. Source: `~/dev/hq/docs/briefs/hq-devbox-setup.md`
 (Derick, 2026-10-12) and `~/dev/hq/docs/reviews/devbox-upgrade-2026-10.md`.
 
+Amendment `hq-devbox-setup-2` (chief, 2026-10-12): **applied**. Key file is `~/.ssh/dev-box_ed25519`, same
+fingerprint SHA256:916R5RzxOo6mrL4ptGwfm1P2DDZbwbz9AFHf8rN1ydU.
+
 Amendment `hq-devbox-setup-1` (Derick via chief, 2026-10-12 07:5xZ): **applied**. The new server is
 named `dev-box` (hostname, Tailscale node, Robot key name, docs); the current machine is `dev-box-1`.
 Caveat: dev-box-1's own OS hostname is still `dev-box` (`/etc/hostname`, `/etc/hosts` 127.0.1.1), so
@@ -21,7 +24,7 @@ dedicated/up.sh provision <public-ip>   # after reboot: bootstrap.sh then setup.
 dedicated/up.sh lockdown  <public-ip>   # after `tailscale up` is approved: drop public 22
 ```
 
-`DEVBOX_KEY` (default `~/.ssh/devbox2_ed25519`) is the SSH identity. Each phase uploads
+`DEVBOX_KEY` (default `~/.ssh/dev-box_ed25519`) is the SSH identity. Each phase uploads
 `files/`, `setup.sh` and `dedicated/` to `/root/provision` + `/root/` exactly as `main.tf` does.
 
 ## Disk layout (lesson 1: two filesystems, no RAID0, no mirror)
