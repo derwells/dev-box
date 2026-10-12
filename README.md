@@ -28,6 +28,12 @@ Ubuntu Server 24.04
 └── Chromium          — for manual visual verification
 ```
 
+## Dedicated (Robot) path
+
+A second path provisions a Hetzner Robot dedicated server (named `dev-box`) with
+`installimage` instead of OpenTofu/cloud-init, reusing `files/` and `setup.sh`. It ends
+Tailscale-only. See [`dedicated/README.md`](dedicated/README.md).
+
 ## Prerequisites
 
 - [OpenTofu](https://opentofu.org/docs/intro/install/) installed locally
