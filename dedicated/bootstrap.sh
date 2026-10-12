@@ -156,6 +156,11 @@ systemctl mask cups.socket cups.service cups-browsed.service 2>/dev/null || true
 # Ubuntu 24.04 also ships CUPS as a snap alongside the chromium snap.
 snap remove --purge cups 2>/dev/null || true
 
+echo "=== headless: no display manager ==="
+# xfce4 pulls in lightdm, which fails without a monitor; VNC runs its own X session.
+systemctl disable lightdm.service 2>/dev/null || true
+systemctl set-default multi-user.target
+
 echo "=== unattended-upgrades ==="
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 systemctl enable --now unattended-upgrades.service
