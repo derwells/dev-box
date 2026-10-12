@@ -113,7 +113,7 @@ KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 SSHD
 sshd -t
-systemctl reload ssh
+systemctl try-reload-or-restart ssh
 
 echo "=== Docker vs the public interface (DOCKER-USER) ==="
 cat > /usr/local/sbin/devbox-docker-user << 'DUSER'
@@ -167,7 +167,7 @@ cat << MSG
 === bootstrap done ===
 Tailscale is installed but not logged in. As root on this box run:
 
-  tailscale up --ssh --hostname dev-box
+  tailscale up --hostname dev-box
 
 Open the login URL it prints, approve the node, then from the operator machine:
 

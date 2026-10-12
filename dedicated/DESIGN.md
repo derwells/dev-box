@@ -53,7 +53,7 @@ Root, idempotent, args `<username> <ssh_pubkey_file>`:
 - Same apt packages as `cloud-init.yaml.tftpl` plus: docker-ce + containerd.io (Docker apt repo,
   user in `docker` group), git-delta, build-essential, rsync, htop, ncdu.
 - gh (apt repo), Tailscale (install script). Do not run `tailscale up` non-interactively; print
-  the instruction `tailscale up --ssh --hostname dev-box` (the operator relays the login URL).
+  the instruction `tailscale up --hostname dev-box` (the operator relays the login URL).
 - UFW: deny incoming, allow outgoing, allow in on tailscale0, allow 22/tcp (removed by lockdown).
 - Data disk + swap as above, then docker/containerd bind mounts, then `systemctl enable docker`.
 - Calls `setup.sh <user> <git name> <git email>` (args passed through by up.sh, defaults
@@ -113,3 +113,10 @@ Goal: nothing on the public IP accepts connections once bootstrap ends. Layers:
 Smoke adds: `ss -tlnH` shows no listener on 0.0.0.0/[::] except sshd (firewalled), `DOCKER-USER`
 drop rule present, docker `ip` = 127.0.0.1, sshd password auth off, and an external probe from
 dev-box-1 to the public IP on 22 and the Docker ports times out after lockdown.
+
+## Tailnet SSH: OpenSSH, not Tailscale SSH (lead decision, 2026-10-12)
+
+dev-box-1 runs `RunSSH=false`: tailnet ssh is plain OpenSSH with keys. dev-box matches it
+(`tailscale up --hostname dev-box`, no `--ssh`). Tailscale SSH's default ACL action is `check`,
+which needs a periodic browser re-auth and would block unattended agent ssh/rsync from dev-box-1.
+Public 22 is still closed by UFW (and the Robot firewall); sshd is keys-only.

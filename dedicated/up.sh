@@ -48,6 +48,17 @@ case "$PHASE" in
     scp_root "$HERE/installimage.conf" "root@$IP:/root/installimage.conf"
     ssh_root 'test -x "$(command -v installimage)"' \
       || { echo "up.sh: installimage not found; is the server in Robot rescue?" >&2; exit 1; }
+    # Only the rescue system has installimage; refuse anywhere else (it wipes disks).
+    ssh_root 'grep -qi rescue /etc/hostname /etc/motd 2>/dev/null' \
+      || { echo "up.sh: $IP is not the Hetzner rescue system; refusing to install" >&2; exit 1; }
+    # UEFI boot needs an ESP; installimage does not add one by itself.
+    ssh_root '[ ! -d /sys/firmware/efi ] || grep -q "^PART /boot/efi" /root/installimage.conf \
+      || sed -i "s#^PART /boot ext4 1G#PART /boot/efi esp 256M\nPART /boot ext4 1G#" /root/installimage.conf'
+    # The second NVMe is not in installimage.conf. Stop arrays left by Hetzner's
+    # preinstall (RAID1 across both disks) and wipe it so data-disk.sh finds it blank.
+    ssh_root 'mdadm --stop --scan || true
+      for p in $(lsblk -lnpo NAME /dev/nvme1n1 | tail -n +2); do wipefs -a "$p"; done
+      wipefs -a /dev/nvme1n1'
     ssh_root 'installimage -a -c /root/installimage.conf'
     echo "installimage done; rebooting (run 'provision' once ssh is back)"
     ssh_root 'reboot' || true   # connection drops as the host goes down
@@ -56,9 +67,13 @@ case "$PHASE" in
     upload_payload
     pub=/root/.ssh/authorized_keys
     force=""; [ "${FORCE_DATA_DISK:-0}" = 1 ] && force="--force-data-disk"
-    ssh_root "bash /root/dedicated/bootstrap.sh '$DEVBOX_USER' '$pub' '$GIT_USER_NAME' '$GIT_USER_EMAIL' --allow-ip='$ALLOW_IP' $force"
+    # Run detached so a dropped ssh session does not kill a 20-minute bootstrap.
+    ssh_root "systemctl reset-failed devbox-bootstrap 2>/dev/null; systemd-run --unit=devbox-bootstrap --collect \
+      bash -c \"bash /root/dedicated/bootstrap.sh '$DEVBOX_USER' '$pub' '$GIT_USER_NAME' '$GIT_USER_EMAIL' --allow-ip='$ALLOW_IP' $force > /root/bootstrap.log 2>&1\""
+    echo "bootstrap running as devbox-bootstrap.service; log: /root/bootstrap.log"
+    ssh_root 'while systemctl is-active -q devbox-bootstrap; do sleep 20; done; tail -n 25 /root/bootstrap.log; grep -q "=== bootstrap done ===" /root/bootstrap.log'
     echo
-    echo "Next: ssh root@$IP, run 'tailscale up --ssh --hostname dev-box', open the login URL,"
+    echo "Next: ssh root@$IP, run 'tailscale up --hostname dev-box', open the login URL,"
     echo "approve the node, then: dedicated/up.sh lockdown $IP"
     ;;
   lockdown)
@@ -73,7 +88,7 @@ case "$PHASE" in
       ufw --force delete allow 22/tcp || true
       ufw status
       sed -i 's/^PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config.d/00-devbox-hardening.conf
-      sshd -t && systemctl reload ssh"
+      sshd -t && systemctl try-reload-or-restart ssh"
     ssh -o BatchMode=yes -o ConnectTimeout=15 "$DEVBOX_USER@$TS_HOST" true \
       || { echo "up.sh: tailscale ssh broke after lockdown; recover via Robot rescue" >&2; exit 1; }
     echo "lockdown ok: public 22 closed, tailscale ssh works"

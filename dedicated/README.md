@@ -20,7 +20,7 @@ Network-level, survives OS mistakes. Before bootstrap, in Robot → Server → F
 # 1. Robot: activate the rescue system for the server (add your key), reset the server.
 dedicated/up.sh install   <public-ip>   # installimage.conf -> installimage -> reboot
 dedicated/up.sh provision <public-ip>   # uploads files/, setup.sh, dedicated/; runs bootstrap.sh -> setup.sh
-# 2. On the box as root:  tailscale up --ssh --hostname dev-box   (open the URL, approve the node)
+# 2. On the box as root:  tailscale up --hostname dev-box   (open the URL, approve the node)
 dedicated/up.sh lockdown  <public-ip>   # removes public 22, sets PermitRootLogin no, verifies Tailscale ssh
 ```
 
