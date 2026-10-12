@@ -46,7 +46,9 @@ upload_payload() {
 case "$PHASE" in
   install)
     scp_root "$HERE/installimage.conf" "root@$IP:/root/installimage.conf"
-    ssh_root 'test -x "$(command -v installimage)"' \
+    # installimage is only an interactive alias in rescue; call the script directly.
+    II=/root/.oldroot/nfs/install/installimage
+    ssh_root "test -x $II" \
       || { echo "up.sh: installimage not found; is the server in Robot rescue?" >&2; exit 1; }
     # Only the rescue system has installimage; refuse anywhere else (it wipes disks).
     ssh_root 'grep -qi rescue /etc/hostname /etc/motd 2>/dev/null' \
@@ -59,7 +61,7 @@ case "$PHASE" in
     ssh_root 'mdadm --stop --scan || true
       for p in $(lsblk -lnpo NAME /dev/nvme1n1 | tail -n +2); do wipefs -a "$p"; done
       wipefs -a /dev/nvme1n1'
-    ssh_root 'installimage -a -c /root/installimage.conf'
+    ssh_root "$II -a -c /root/installimage.conf"
     echo "installimage done; rebooting (run 'provision' once ssh is back)"
     ssh_root 'reboot' || true   # connection drops as the host goes down
     ;;
