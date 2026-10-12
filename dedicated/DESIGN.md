@@ -3,8 +3,14 @@
 Agreed brief for the `hq-devbox-setup` effort. Source: `~/dev/hq/docs/briefs/hq-devbox-setup.md`
 (Derick, 2026-10-12) and `~/dev/hq/docs/reviews/devbox-upgrade-2026-10.md`.
 
+Amendment `hq-devbox-setup-1` (Derick via chief, 2026-10-12 07:5xZ): **applied**. The new server is
+named `dev-box` (hostname, Tailscale node, Robot key name, docs); the current machine is `dev-box-1`.
+Caveat: dev-box-1's own OS hostname is still `dev-box` (`/etc/hostname`, `/etc/hosts` 127.0.1.1), so
+on dev-box-1 a bare `ssh dev-box` resolves to itself until that is changed or an ssh alias is added.
+Docs and scripts here use the MagicDNS FQDN or an explicit target IP, never a bare `dev-box` lookup.
+
 Target: Hetzner EX44-1-LTD (i5-13500, 64 GB, 2 x 512 GB NVMe), Robot-managed, no cloud-init,
-no OpenTofu resource. Tailscale name `dev-box-2`. The hcloud path (`main.tf`,
+no OpenTofu resource. Tailscale name `dev-box`. The hcloud path (`main.tf`,
 `cloud-init.yaml.tftpl`) stays intact and is not applied.
 
 ## Flow (one command per phase, run from any machine holding the key)
@@ -21,7 +27,7 @@ dedicated/up.sh lockdown  <public-ip>   # after `tailscale up` is approved: drop
 ## Disk layout (lesson 1: two filesystems, no RAID0, no mirror)
 
 - `installimage.conf`: Ubuntu 24.04, `SWRAID 0`, DRIVE1 only partitioned: `/boot` 1G ext4,
-  `/` all ext4. Hostname `dev-box-2`.
+  `/` all ext4. Hostname `dev-box`.
 - nvme0n1 (`/`): `/home`, `~/dev`, worktrees, uv cache (`~/.uv-cache`, same fs so hard links
   work), `/swapfile` 16 GiB (`chmod 600`, fstab, `vm.swappiness=10`).
 - nvme1n1 (`/data`): ext4 by UUID, `nofail`. Holds `/data/docker` and `/data/containerd`
@@ -41,7 +47,7 @@ Root, idempotent, args `<username> <ssh_pubkey_file>`:
 - Same apt packages as `cloud-init.yaml.tftpl` plus: docker-ce + containerd.io (Docker apt repo,
   user in `docker` group), git-delta, build-essential, rsync, htop, ncdu.
 - gh (apt repo), Tailscale (install script). Do not run `tailscale up` non-interactively; print
-  the instruction `tailscale up --ssh --hostname dev-box-2` (the operator relays the login URL).
+  the instruction `tailscale up --ssh --hostname dev-box` (the operator relays the login URL).
 - UFW: deny incoming, allow outgoing, allow in on tailscale0, allow 22/tcp (removed by lockdown).
 - Data disk + swap as above, then docker/containerd bind mounts, then `systemctl enable docker`.
 - Calls `setup.sh <user> <git name> <git email>` (args passed through by up.sh, defaults
@@ -59,7 +65,7 @@ Root, idempotent, args `<username> <ssh_pubkey_file>`:
 ## lockdown
 
 After Tailscale SSH works: `ufw delete allow 22/tcp`, verify `ufw status`, verify from the
-operator's machine that `ssh dev-box-2` over Tailscale still works before returning. Recovery
+operator's machine that `ssh dev-box` over Tailscale still works before returning. Recovery
 if Tailscale breaks: Robot rescue system.
 
 ## Not in this repo (installed from hq after migration, step 3/4)
@@ -71,7 +77,7 @@ and is part of the smoke.
 
 ## Smoke (`tests/smoke-dedicated.sh`, run on the box as the user)
 
-Prints PASS/FAIL per check, non-zero exit on any FAIL: hostname, tailscale up as dev-box-2,
+Prints PASS/FAIL per check, non-zero exit on any FAIL: hostname, tailscale up as dev-box,
 `swapon --show` has 16G `/swapfile`, `/` and `/data` are distinct devices, docker data-root under
 `/data`, `~/.cache` -> `/data/...`, UFW has no public 22 (after lockdown), noVNC/websockify not
 listening on 0.0.0.0, devbox-guard drop-ins + devbox-iocost active, fleet.slice + hygiene timers
