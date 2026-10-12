@@ -3,6 +3,16 @@
 Agreed brief for the `hq-devbox-setup` effort. Source: `~/dev/hq/docs/briefs/hq-devbox-setup.md`
 (Derick, 2026-10-12) and `~/dev/hq/docs/reviews/devbox-upgrade-2026-10.md`.
 
+Amendment `hq-devbox-setup-6` (Derick via chief, 2026-10-12 08:3xZ, "we just need the repos on
+there. no need to keep the existing logs"): **applied**. Migration payload is git repos under `~/dev` only:
+main checkouts (with their dirty/untracked files), worktrees only where a live effort needs one
+(branches are pushed). `dev-box` and `hq` go first and are the rehearsal; the rest of `~/dev` is one
+rsync pass on Derick's word. NOT copied: Claude/Codex session history, fleet agent records/state
+history, Paseo logs, hygiene logs, journals outside git, Docker volumes, database data. Environments and
+caches are rebuilt; fleet state on dev-box starts fresh. Runtime files outside git (env files, Supabase
+dumps, model caches) go on a "Derick moves or recreates" list in the runbook. Keep the installed
+two-filesystem layout. Supersedes the `~/.local/state/fleet` snapshot in the porting order.
+
 Amendment `hq-devbox-setup-3` (chief on Derick's OK, 2026-10-12): **applied**, verified. dev-box-1's
 OS hostname is `dev-box-1`, `/etc/hosts` line 8 is `127.0.1.1 dev-box-1 dev-box-1`, and dev-box-1's
 `~/.ssh/config` maps `Host dev-box` to `dev-box.<tailnet>.ts.net` (user derick, key
