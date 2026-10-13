@@ -107,6 +107,10 @@ User units only, bound to loopback or the tailnet address.
 
 ## 7. Kill week for dev-box-1
 
+Changed 2026-10-13 (Derick): `dev-box-1` stays alive as a QA machine for one client stack that
+needs about 23 GB. Steps 4 and 6 are cancelled and step 5 stays pending. aide and the timers stay
+off there; sshd, the tmux `fleet` session and Tailscale stay on.
+
 1. [ ] Ongoing efforts finish or hand off. Re-run `dev-inventory.py` on both machines, push anything
    safe, and settle the rest of the push list. **lead + Derick.** Done 2026-10-13: repos with no
    remote and data folders that existed only on `dev-box-1` were copied with
@@ -126,8 +130,10 @@ User units only, bound to loopback or the tailnet address.
    `tests/smoke-dedicated.sh --probe <public-ip>` must show every public port closed. **lead.**
    2026-10-13, before the reboot: smoke with `SMOKE_FLEET=1` 37 PASS, 2 SKIP (hygiene timers),
    0 FAIL after adding a `pnpm` shim like the `codex` one; probe from `dev-box-1`: all ten ports
-   closed. The reboot waits for the chief's go (Derick is logged in there).
+   closed. Deferred: the reboot and the second smoke run wait until Derick is not logged in on
+   `dev-box`.
 4. [ ] Delete the Cloud server (`tofu destroy` from the laptop, or the Hetzner console) and remove
-   its Tailscale node. **Derick**
-5. [ ] Delete the legacy hcloud files from this repo and the local tofu state. **lead**
-6. [ ] Laptop: remove `dev-box-1` from `~/.ssh/config`. **Derick**
+   its Tailscale node. **Derick.** Cancelled 2026-10-13: `dev-box-1` stays as a QA machine.
+5. [ ] Delete the legacy hcloud files from this repo and the local tofu state. **lead.** Pending
+   while `dev-box-1` is alive (its tofu state still manages it).
+6. [ ] Laptop: remove `dev-box-1` from `~/.ssh/config`. **Derick.** Cancelled 2026-10-13.

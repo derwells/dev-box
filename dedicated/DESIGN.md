@@ -12,7 +12,9 @@ first steps after lockdown are in [`START.md`](START.md).
   files) went to `~/.config/dev-box/bundles` on `dev-box`. Fleet records and Claude/Codex session
   transcripts were copied with `--ignore-existing`. Step 2 on `dev-box-1`: aide off, `gwsa check`
   cron line removed, eight user timers disabled. Step 3: pre-reboot smoke clean after a `pnpm` shim
-  (same fnm reason as `codex`), public probe closed; the reboot waits for the chief.
+  (same fnm reason as `codex`), public probe closed; the reboot is deferred until Derick is not
+  logged in on `dev-box`. Then Derick changed the plan: `dev-box-1` stays as a QA machine for one
+  client stack, so kill-week steps 4 and 6 are cancelled and step 5 stays pending.
 - `hq-devbox-setup-17` (2026-10-13): applied; supersedes -7's "no rsync" for repos without a remote
   and data folders that exist nowhere else. Those were copied with `--ignore-existing`; no build
   output, worktrees or secrets. Global git ignore (`files/home/gitignore`) back-ported.
