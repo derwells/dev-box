@@ -87,7 +87,8 @@ User units only, bound to loopback or the tailnet address.
   `dev-box`; gateway ready, chief cursor identical on both. **lead**
 - [ ] alpha-mill daily timer: its effort recreates it later (it sends a fleet `say`). **lead, later**
 - [ ] The nightly Fly backup timer (`*-fly-backup`): waits on Derick's `fly auth login` on
-  `dev-box` (**Derick, now**); then the lead installs `flyctl` and the timer (**lead**).
+  `dev-box` (**Derick, now**); then the lead installs `flyctl` and the timer (**lead**). The
+  `dev-box-1` backup timer is now disabled, so no backup runs until it is installed on `dev-box`.
 - Not moving: the one-off `default-*` timers, paseo, and that app's bot.
 
 ## 5. Docker
@@ -111,11 +112,21 @@ User units only, bound to loopback or the tailnet address.
    remote and data folders that existed only on `dev-box-1` were copied with
    `rsync -aR --ignore-existing`. Build output, `*-wt-*` worktrees and `.env`/`.dev.vars` files
    were excluded. Tracked files inside excluded folders were restored from each repo's own `.git`,
-   and every copied repo's HEAD and dirty count matches `dev-box-1`. **lead**
-2. [ ] On `dev-box-1`: stop aide (only after it runs on `dev-box`), remove the `gwsa check` crontab
-   line, and disable the remaining timers. **lead**
+   and every copied repo's HEAD and dirty count matches `dev-box-1`. Before step 2, one git bundle
+   per repo of refs not on any remote, plus uncommitted work per worktree (patch and untracked
+   tarball; secret-shaped files never captured), went to `~/.config/dev-box/bundles` on `dev-box`.
+   Fleet agent records and Claude/Codex session transcripts were copied with `--ignore-existing`
+   (no auth files, no worktree trash). Two flagged branches were not pushed (pre-rebase copies of
+   merged PRs). **lead**
+2. [x] On `dev-box-1`: stop aide (only after it runs on `dev-box`), remove the `gwsa check` crontab
+   line, and disable the remaining timers. **lead.** Done 2026-10-13: aide off since the 05:59Z
+   cutover; `gwsa check` cron line removed, backup in `~/.config/dev-box`; the eight user timers
+   disabled; tmux fleet session, sshd, fleet-watch, hqweb and sieve left running.
 3. [ ] On `dev-box`: run `tests/smoke-dedicated.sh`, reboot, and run it again. From the laptop:
-   `tests/smoke-dedicated.sh --probe <public-ip>` must show every public port closed. **lead**
+   `tests/smoke-dedicated.sh --probe <public-ip>` must show every public port closed. **lead.**
+   2026-10-13, before the reboot: smoke with `SMOKE_FLEET=1` 37 PASS, 2 SKIP (hygiene timers),
+   0 FAIL after adding a `pnpm` shim like the `codex` one; probe from `dev-box-1`: all ten ports
+   closed. The reboot waits for the chief's go (Derick is logged in there).
 4. [ ] Delete the Cloud server (`tofu destroy` from the laptop, or the Hetzner console) and remove
    its Tailscale node. **Derick**
 5. [ ] Delete the legacy hcloud files from this repo and the local tofu state. **lead**

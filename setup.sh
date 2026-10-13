@@ -134,19 +134,18 @@ run_node "npm install -g pnpm"
 # fails on an untested Codex). Merge only the [tui] keys: never clobber an existing file.
 CODEX_VERSION=0.159.0
 run_node "npm install -g @openai/codex@$CODEX_VERSION"
-# Stable `codex` on PATH for non-interactive shells, systemd and fleet windows
-# (same reason and shape as the gws shim above).
-cat > "$H/.local/bin/codex" << 'CODEXSHIM'
-#!/bin/sh
-D="$HOME/.local/share/fnm/aliases/default/bin"
-PATH="$D:$PATH" exec "$D/codex" "$@"
-CODEXSHIM
-chmod 0755 "$H/.local/bin/codex"
-chown "$USERNAME:$USERNAME" "$H/.local/bin/codex"
+# Stable `codex` and `pnpm` on PATH for non-interactive shells, systemd and fleet
+# windows (same reason and shape as the gws shim above).
+for t in codex pnpm; do
+  printf '%s\n' '#!/bin/sh' 'D="$HOME/.local/share/fnm/aliases/default/bin"' \
+    "PATH=\"\$D:\$PATH\" exec \"\$D/$t\" \"\$@\"" > "$H/.local/bin/$t"
+  chmod 0755 "$H/.local/bin/$t"
+  chown "$USERNAME:$USERNAME" "$H/.local/bin/$t"
+done
 # ~/.local/bin on every user unit's PATH (fleet windows, systemd-run). Named 999-
 # so it runs after Ubuntu's 99-environment.conf, which reloads /etc/environment.
 mkdir -p "$H/.config/environment.d"
-printf '%s\n' '# Stable tool shims (fleet, claude, codex, gws, opencode) for every user unit.' \
+printf '%s\n' '# Stable tool shims (fleet, claude, codex, pnpm, gws, opencode) for every user unit.' \
   'PATH=${HOME}/.local/bin:${PATH}' > "$H/.config/environment.d/999-local-bin.conf"
 chown -R "$USERNAME:$USERNAME" "$H/.config/environment.d"
 

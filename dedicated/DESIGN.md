@@ -7,6 +7,12 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-18` (2026-10-13, Derick "stop all work here and switch over"): applied; kill-week
+  steps 2 and 3. Git bundles of unpushed refs and per-worktree uncommitted work (no secret-shaped
+  files) went to `~/.config/dev-box/bundles` on `dev-box`. Fleet records and Claude/Codex session
+  transcripts were copied with `--ignore-existing`. Step 2 on `dev-box-1`: aide off, `gwsa check`
+  cron line removed, eight user timers disabled. Step 3: pre-reboot smoke clean after a `pnpm` shim
+  (same fnm reason as `codex`), public probe closed; the reboot waits for the chief.
 - `hq-devbox-setup-17` (2026-10-13): applied; supersedes -7's "no rsync" for repos without a remote
   and data folders that exist nowhere else. Those were copied with `--ignore-existing`; no build
   output, worktrees or secrets. Global git ignore (`files/home/gitignore`) back-ported.
