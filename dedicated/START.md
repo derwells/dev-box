@@ -79,13 +79,17 @@ User units only, bound to loopback or the tailnet address.
   Verified over the tailnet: client 200, valid TLS, `/api/health` clean; public port closed. **lead**
 - [ ] Reinstall the phone app from the `dev-box` address (push subscriptions are per address).
   **Derick, now**
-- [ ] aide: run `aide/install.sh`, copy the token and config (section 2), stop it on `dev-box-1`,
-  then enable it on `dev-box`. Never run both, because they would post twice. **lead, move**
-- [ ] alpha-mill daily timer: it sends a fleet `say`, so its effort recreates it once fleet runs.
-  **lead, move**
-- [ ] The nightly Fly backup timer (`*-fly-backup`): needs `flyctl` (**lead**) and `fly auth login`
-  (**Derick**). Keep it only if that app's backups still matter, since its bot is not moving.
-  **Derick decides, now**
+- [x] aide installed but not started: runtime worktree `~/dev/hq-aide-runtime` at the same commit as
+  `dev-box-1`, `aide/install.sh` (unit written, disabled), `~/.config/aide/{discord_token,config.toml}`
+  and all of `~/.local/state/aide/` copied; a dry run (`--dry-run --once --fake-wording`) works and
+  leaves the state alone. **lead**
+- [ ] aide cutover, only after Derick has run `fleet up` on `dev-box` and the chief says go; all in
+  the same minute, never two bots on one token: on `dev-box-1`, `systemctl --user disable --now aide`;
+  then `rsync -a ~/.local/state/aide/ dev-box:.local/state/aide/` (the state kept changing since the
+  copy); then on `dev-box`, `systemctl --user enable --now aide`. **lead, move**
+- [ ] alpha-mill daily timer: its effort recreates it later (it sends a fleet `say`). **lead, later**
+- [ ] The nightly Fly backup timer (`*-fly-backup`): waits on Derick's `fly auth login` on
+  `dev-box` (**Derick, now**); then the lead installs `flyctl` and the timer (**lead**).
 - Not moving: the one-off `default-*` timers, paseo, and that app's bot.
 
 ## 5. Docker

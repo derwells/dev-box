@@ -7,6 +7,11 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-15` (2026-10-13, Derick waived the clean day): applied. Fleet step done
+  (binary from hq main, fleet-watch, native delegation hooks, `fleet doctor` PASS; Codex pinned,
+  opencode added); hq skills linked; hq #118 merged and hqweb live on the tailnet, plus hq #174 (unit
+  PATH fix for the binary); aide installed with config and state copied but not started. Kill week
+  not started.
 - `hq-devbox-setup-14` (2026-10-12): applied. Fleet on `dev-box` is the native binary only, built
   from hq `main` (`post-hq.sh`); no `fleet.py`. The move waits for the chief to confirm the clean day
   (around 2026-10-13 19:10Z). A trial build from `35af674` matched the reference sha256 and was
