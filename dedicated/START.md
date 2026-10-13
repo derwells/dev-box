@@ -50,9 +50,10 @@ put a value on `dev-box`. Values that already exist are copied file to file, und
   `[tui]`. Codex re-adds project trust entries on first use. **lead**
 - [x] `setup.sh` re-run with this branch, so `files/` (claudex search, model-check, shared
   instructions) matches the repo. **lead**
-- [ ] hq-owned skills (`chief`, `lead`, `dispatch`, `advise`, `research-fanout`, `discord-catchup`),
-  the Codex `{low,medium,high}.config.toml` profiles. The fleet hooks come from
-  `fleet delegation install --native` (section 4). **lead, move**
+- [x] hq-owned skills (`chief`, `lead`, `dispatch`, `advise`, `research-fanout`, `discord-catchup`)
+  linked from `~/dev/hq/skills` into `~/.claude/skills`, `~/.agents/skills` and `~/.codex/skills`;
+  the Codex `{low,medium,high}.config.toml` profiles copied. The fleet hooks come from
+  `fleet delegation install --native` (section 4). **lead**
 - [ ] Optional: the Android binder module, needed only for Android emulator work:
   `apt install linux-modules-extra-$(uname -r)`, `modprobe binder_linux`, then persist it in
   `/etc/modules-load.d/`. **lead, now on request**
@@ -73,10 +74,11 @@ User units only, bound to loopback or the tailnet address.
   opencode installed, the `readonly-approve` hook added; `fleet doctor` PASS overall. **lead**
 - [ ] `fleet-hygiene` and `fleet-hygiene-uv` timers. Derick said on 2026-10-12 they are not needed;
   the port keeps them, so `post-hq.sh --hygiene` installs them if wanted. **Derick decides, move**
-- [ ] hqweb and `hqweb-cert.timer`: merge hq PR #118, `uv sync` in `web/server`,
-  `pnpm install && pnpm build` in `web/client`, `deploy/renew-cert.sh`, copy the units from
-  `web/server/deploy/`, then enable them. **lead, move.** Afterwards, reinstall the phone app from
-  the new address (push subscriptions are per address). **Derick**
+- [x] hqweb and `hqweb-cert.timer`: `uv sync` in `web/server`, `pnpm install && pnpm build` in
+  `web/client`, `deploy/renew-cert.sh`, copy the three units from `web/server/deploy/`, enable them.
+  Verified over the tailnet: client 200, valid TLS, `/api/health` clean; public port closed. **lead**
+- [ ] Reinstall the phone app from the `dev-box` address (push subscriptions are per address).
+  **Derick, now**
 - [ ] aide: run `aide/install.sh`, copy the token and config (section 2), stop it on `dev-box-1`,
   then enable it on `dev-box`. Never run both, because they would post twice. **lead, move**
 - [ ] alpha-mill daily timer: it sends a fleet `say`, so its effort recreates it once fleet runs.
