@@ -45,6 +45,13 @@ else
   [ -f /usr/share/doc/fzf/examples/completion.zsh ] && source /usr/share/doc/fzf/examples/completion.zsh
 fi
 
+# opencode (installer puts it in ~/.opencode/bin); its OpenCode Go key is read
+# from opencode's own auth file at runtime, never stored here.
+[ -d "$HOME/.opencode/bin" ] && export PATH="$HOME/.opencode/bin:$PATH"
+[ -r ~/.local/share/opencode/auth.json ] && export OPENCODE_API_KEY="$(jq -r '."opencode-go".key // empty' ~/.local/share/opencode/auth.json)"
+# flyctl and bun, when installed
+[ -d "$HOME/.fly/bin" ] && export FLYCTL_INSTALL="$HOME/.fly" && export PATH="$FLYCTL_INSTALL/bin:$PATH"
+[ -d "$HOME/.bun/bin" ] && export BUN_INSTALL="$HOME/.bun" && export PATH="$BUN_INSTALL/bin:$PATH"
 
 # zoxide (z command) — must be last
 command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"

@@ -64,12 +64,13 @@ User units only, bound to loopback or the tailnet address.
 - [x] sieve, with its SearXNG container (`bin/sieve-searxng start`, loopback). **lead**
 - [x] `gwsa check --notify` cron (08:30), installed by `setup.sh`. Both machines ping until
   `dev-box-1` is gone. **lead**
-- [ ] Fleet binary, fleet-watch and delegation hooks: `dedicated/post-hq.sh ~/dev/hq` with hq on
+- [x] Fleet binary, fleet-watch and delegation hooks: `dedicated/post-hq.sh ~/dev/hq` with hq on
   `main`. It builds `fleet-rs` with `CARGO_TARGET_DIR=/data/home/$USER/cargo-target/hq`
   (`cargo build --release --locked -p fleet`), installs `~/.local/bin/fleet`, then runs
   `fleet service install`, `fleet delegation install --native` and `fleet doctor`. `~/.local/bin`
-  is on the login PATH, so the tmux server and its hooks find plain `fleet`. A trial build from hq
-  `35af674` matched the reference sha256 (`3461d59c…`) and was uninstalled again. **lead, move**
+  is on the login PATH, so the tmux server and its hooks find plain `fleet`. Done 2026-10-13 from
+  hq `8c9d872` (sha256 `8ac56612…`, same as `dev-box-1`); Codex pinned to the tested version,
+  opencode installed, the `readonly-approve` hook added; `fleet doctor` PASS overall. **lead**
 - [ ] `fleet-hygiene` and `fleet-hygiene-uv` timers. Derick said on 2026-10-12 they are not needed;
   the port keeps them, so `post-hq.sh --hygiene` installs them if wanted. **Derick decides, move**
 - [ ] hqweb and `hqweb-cert.timer`: merge hq PR #118, `uv sync` in `web/server`,

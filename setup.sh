@@ -127,8 +127,14 @@ run_user "curl -LsSf https://astral.sh/uv/install.sh | sh"
 # pnpm
 run_node "npm install -g pnpm"
 
-# Codex CLI + its config. Merge only the [tui] keys: never clobber an existing file.
-run_node "npm install -g @openai/codex"
+# Codex CLI + its config. Pinned to hq fleet's CODEX_TESTED_VERSION (`fleet doctor`
+# fails on an untested Codex). Merge only the [tui] keys: never clobber an existing file.
+CODEX_VERSION=0.159.0
+run_node "npm install -g @openai/codex@$CODEX_VERSION"
+
+# opencode (a fleet provider). Pinned like Codex; ~/.opencode/bin is on PATH via .zshrc.
+OPENCODE_VERSION=1.18.32
+run_user "curl -fsSL https://opencode.ai/install | bash -s -- --version $OPENCODE_VERSION --no-modify-path"
 cat > /tmp/codex-tui-patch.py << 'CODEXPATCH'
 import os, re
 path = os.path.expanduser("~/.codex/config.toml")
