@@ -106,8 +106,12 @@ User units only, bound to loopback or the tailnet address.
 
 ## 7. Kill week for dev-box-1
 
-1. [ ] Ongoing efforts finish or hand off. Re-run `dev-inventory.py` on `dev-box-1`, push anything
-   safe, and settle the rest of the push list. **lead + Derick**
+1. [ ] Ongoing efforts finish or hand off. Re-run `dev-inventory.py` on both machines, push anything
+   safe, and settle the rest of the push list. **lead + Derick.** Done 2026-10-13: repos with no
+   remote and data folders that existed only on `dev-box-1` were copied with
+   `rsync -aR --ignore-existing`. Build output, `*-wt-*` worktrees and `.env`/`.dev.vars` files
+   were excluded. Tracked files inside excluded folders were restored from each repo's own `.git`,
+   and every copied repo's HEAD and dirty count matches `dev-box-1`. **lead**
 2. [ ] On `dev-box-1`: stop aide (only after it runs on `dev-box`), remove the `gwsa check` crontab
    line, and disable the remaining timers. **lead**
 3. [ ] On `dev-box`: run `tests/smoke-dedicated.sh`, reboot, and run it again. From the laptop:

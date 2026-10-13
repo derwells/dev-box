@@ -7,6 +7,9 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-17` (2026-10-13): applied; supersedes -7's "no rsync" for repos without a remote
+  and data folders that exist nowhere else. Those were copied with `--ignore-existing`; no build
+  output, worktrees or secrets. Global git ignore (`files/home/gitignore`) back-ported.
 - `hq-devbox-setup-16` (2026-10-13, Derick "aide go"): applied. aide moved to `dev-box` in two
   seconds (stop, re-sync state, start). Stable `codex` shim and `opencode` link in `~/.local/bin`, and
   `~/.config/environment.d/999-local-bin.conf` so every user unit finds them.

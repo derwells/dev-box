@@ -112,6 +112,9 @@ echo "=== Shell environment (tmux, zsh, starship) ==="
 install -m 0644 "$PAYLOAD/home/tmux.conf" "$H/.tmux.conf"
 install -m 0644 "$PAYLOAD/home/zshenv" "$H/.zshenv"
 install -m 0644 "$PAYLOAD/home/zshrc" "$H/.zshrc"
+# Global git ignore (git reads ~/.config/git/ignore by default): per-user agent settings.
+install -D -m 0644 "$PAYLOAD/home/gitignore" "$H/.config/git/ignore"
+chown -R "$USERNAME:$USERNAME" "$H/.config/git"
 mkdir -p "$H/.config"
 install -m 0644 "$PAYLOAD/home/config/starship.toml" "$H/.config/starship.toml"
 
