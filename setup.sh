@@ -131,10 +131,27 @@ run_node "npm install -g pnpm"
 # fails on an untested Codex). Merge only the [tui] keys: never clobber an existing file.
 CODEX_VERSION=0.159.0
 run_node "npm install -g @openai/codex@$CODEX_VERSION"
+# Stable `codex` on PATH for non-interactive shells, systemd and fleet windows
+# (same reason and shape as the gws shim above).
+cat > "$H/.local/bin/codex" << 'CODEXSHIM'
+#!/bin/sh
+D="$HOME/.local/share/fnm/aliases/default/bin"
+PATH="$D:$PATH" exec "$D/codex" "$@"
+CODEXSHIM
+chmod 0755 "$H/.local/bin/codex"
+chown "$USERNAME:$USERNAME" "$H/.local/bin/codex"
+# ~/.local/bin on every user unit's PATH (fleet windows, systemd-run). Named 999-
+# so it runs after Ubuntu's 99-environment.conf, which reloads /etc/environment.
+mkdir -p "$H/.config/environment.d"
+printf '%s\n' '# Stable tool shims (fleet, claude, codex, gws, opencode) for every user unit.' \
+  'PATH=${HOME}/.local/bin:${PATH}' > "$H/.config/environment.d/999-local-bin.conf"
+chown -R "$USERNAME:$USERNAME" "$H/.config/environment.d"
 
 # opencode (a fleet provider). Pinned like Codex; ~/.opencode/bin is on PATH via .zshrc.
 OPENCODE_VERSION=1.18.32
 run_user "curl -fsSL https://opencode.ai/install | bash -s -- --version $OPENCODE_VERSION --no-modify-path"
+# ~/.opencode/bin is only on PATH in interactive zsh; link it for everything else.
+run_user "ln -sfn \"\$HOME/.opencode/bin/opencode\" \"\$HOME/.local/bin/opencode\""
 cat > /tmp/codex-tui-patch.py << 'CODEXPATCH'
 import os, re
 path = os.path.expanduser("~/.codex/config.toml")

@@ -7,6 +7,9 @@ first steps after lockdown are in [`START.md`](START.md).
 
 ## Amendments (newest first)
 
+- `hq-devbox-setup-16` (2026-10-13, Derick "aide go"): applied. aide moved to `dev-box` in two
+  seconds (stop, re-sync state, start). Stable `codex` shim and `opencode` link in `~/.local/bin`, and
+  `~/.config/environment.d/999-local-bin.conf` so every user unit finds them.
 - `hq-devbox-setup-15` (2026-10-13, Derick waived the clean day): applied. Fleet step done
   (binary from hq main, fleet-watch, native delegation hooks, `fleet doctor` PASS; Codex pinned,
   opencode added); hq skills linked; hq #118 merged and hqweb live on the tailnet, plus hq #174 (unit
