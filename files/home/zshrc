@@ -45,16 +45,24 @@ else
   [ -f /usr/share/doc/fzf/examples/completion.zsh ] && source /usr/share/doc/fzf/examples/completion.zsh
 fi
 
+# opencode (installer puts it in ~/.opencode/bin); its OpenCode Go key is read
+# from opencode's own auth file at runtime, never stored here.
+[ -d "$HOME/.opencode/bin" ] && export PATH="$HOME/.opencode/bin:$PATH"
+[ -r ~/.local/share/opencode/auth.json ] && export OPENCODE_API_KEY="$(jq -r '."opencode-go".key // empty' ~/.local/share/opencode/auth.json)"
+# flyctl and bun, when installed
+[ -d "$HOME/.fly/bin" ] && export FLYCTL_INSTALL="$HOME/.fly" && export PATH="$FLYCTL_INSTALL/bin:$PATH"
+[ -d "$HOME/.bun/bin" ] && export BUN_INSTALL="$HOME/.bun" && export PATH="$BUN_INSTALL/bin:$PATH"
 
 # zoxide (z command) — must be last
 command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
 
-# Auto-attach to tmux session "main" (or create it). Interactive shells only,
-# so provisioning/`ssh host <cmd>` runs are never swallowed by tmux.
+# Auto-attach to the tmux session "fleet" if it exists, else "main" (or create
+# it). Interactive shells only, so provisioning/`ssh host <cmd>` runs are never
+# swallowed by tmux.
 # A fresh tmux server starts in fleet.slice (low CPU/IO weight): tmux puts
 # every pane in its server's slice, so agents can't starve sshd/tailscaled.
 if [[ $- == *i* ]] && command -v tmux >/dev/null 2>&1 && [ -z "$TMUX" ]; then
   tmux ls >/dev/null 2>&1 || systemd-run --user --scope --quiet --slice=fleet.slice \
     --unit=default-tmux tmux new-session -d -s main 2>/dev/null
-  tmux attach -t main 2>/dev/null || tmux new -s main
+  tmux attach -t fleet 2>/dev/null || tmux attach -t main 2>/dev/null || tmux new -s main
 fi

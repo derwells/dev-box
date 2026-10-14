@@ -33,7 +33,7 @@ run_user() {
 
 echo "=== Node.js via fnm ==="
 run_user "curl -fsSL https://fnm.vercel.app/install | bash"
-run_node "fnm install --lts && fnm use --lts"
+run_node "fnm install --lts && fnm default lts-latest"
 
 echo "=== Claude Code + gws ==="
 # Native installer: binary in ~/.local/bin, self-updating. Not npm: the box
@@ -44,24 +44,26 @@ run_user "curl -fsSL https://claude.ai/install.sh | bash"
 # gws (Google Workspace CLI) — backs /brain and the gwsa multi-account wrapper.
 # Pinned; auth is a manual post-deploy step (gwsa login <slot>).
 run_node "npm install -g @googleworkspace/cli@0.22.5"
+# Stable `gws` on PATH for non-interactive shells and cron (fnm's multishell dir
+# is only on PATH in interactive shells). Follows fnm's default Node.
+mkdir -p "$H/.local/bin"
+cat > "$H/.local/bin/gws" << 'GWSSHIM'
+#!/bin/sh
+D="$HOME/.local/share/fnm/aliases/default/bin"
+PATH="$D:$PATH" exec "$D/gws" "$@"
+GWSSHIM
+chmod 0755 "$H/.local/bin/gws"
+chown -R "$USERNAME:$USERNAME" "$H/.local"
 
-echo "=== claudex wrapper ==="
+echo "=== claudex wrapper + MiMo search bridge ==="
 install -m 0755 "$PAYLOAD/bin/claudex" /usr/local/bin/claudex
+# Stdio MCP server (Python, stdlib only). claudex adds it as mcp__mimo__web_search
+# when this file is executable; it stays idle until a MiMo key exists.
+install -m 0755 "$PAYLOAD/bin/claudex-mimo-search" /usr/local/bin/claudex-mimo-search
 
-echo "=== ~/.claude payload (search bridge, statusline) ==="
+echo "=== ~/.claude payload (statusline) ==="
 mkdir -p "$H/.claude"
-install -m 0644 "$PAYLOAD/claude/mimo-search-mcp.mjs" "$H/.claude/mimo-search-mcp.mjs"
 install -m 0755 "$PAYLOAD/claude/statusline-command.sh" "$H/.claude/statusline-command.sh"
-cat > "$H/.claude/search_mcp.json" << EOF
-{
-  "mcpServers": {
-    "mimo-search": {
-      "command": "node",
-      "args": ["$H/.claude/mimo-search-mcp.mjs"]
-    }
-  }
-}
-EOF
 chown -R "$USERNAME:$USERNAME" "$H/.claude"
 
 echo "=== agent-shared: one instruction source rendered for Claude, Codex, OpenCode ==="
@@ -71,16 +73,21 @@ echo "=== agent-shared: one instruction source rendered for Claude, Codex, OpenC
 mkdir -p "$H/.config/agent-shared/instructions"
 install -m 0644 "$PAYLOAD"/agent-shared/instructions/*.md "$H/.config/agent-shared/instructions/"
 install -m 0755 "$PAYLOAD/agent-shared/sync.py" "$H/.config/agent-shared/sync.py"
+# Generic skills versioned with sync.py (full sync.py also links them; the
+# fresh-box --instructions-only run below does not, so link them here).
+mkdir -p "$H/.config/agent-shared/skills/model-check" "$H/.claude/skills" "$H/.agents/skills"
+install -m 0644 "$PAYLOAD/agent-shared/skills/model-check/SKILL.md" "$H/.config/agent-shared/skills/model-check/SKILL.md"
+ln -sfn "$H/.config/agent-shared/skills/model-check" "$H/.claude/skills/model-check"
+ln -sfn "$H/.config/agent-shared/skills/model-check" "$H/.agents/skills/model-check"
 chown -R "$USERNAME:$USERNAME" "$H/.config/agent-shared"
 run_user "python3 $H/.config/agent-shared/sync.py --instructions-only"
-chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
+chown -R "$USERNAME:$USERNAME" "$H/.claude" "$H/.agents" "$H/.codex" "$H/.config/opencode" 2>/dev/null || true
 
 echo "=== Claude Code settings (merge) ==="
 install -m 0644 "$PAYLOAD/claude/claude-settings-patch.js" /tmp/claude-settings-patch.js
 run_node "node /tmp/claude-settings-patch.js"
 rm -f /tmp/claude-settings-patch.js
 
-echo "=== Shell environment (tmux, zsh, starship) ==="
 echo "=== Shared Claude/Codex attention panel ==="
 ATTENTION_DIR="$H/.local/share/agent-attention"
 mkdir -p "$ATTENTION_DIR" "$H/.local/bin" "$H/.config/systemd/user" "$H/.claude/hooks"
@@ -101,9 +108,13 @@ if [ -S "/run/user/$ATTENTION_UID/bus" ]; then
   run_user "XDG_RUNTIME_DIR=/run/user/$ATTENTION_UID systemctl --user daemon-reload"
   run_user "XDG_RUNTIME_DIR=/run/user/$ATTENTION_UID systemctl --user restart agent-attention.service"
 fi
+echo "=== Shell environment (tmux, zsh, starship) ==="
 install -m 0644 "$PAYLOAD/home/tmux.conf" "$H/.tmux.conf"
 install -m 0644 "$PAYLOAD/home/zshenv" "$H/.zshenv"
 install -m 0644 "$PAYLOAD/home/zshrc" "$H/.zshrc"
+# Global git ignore (git reads ~/.config/git/ignore by default): per-user agent settings.
+install -D -m 0644 "$PAYLOAD/home/gitignore" "$H/.config/git/ignore"
+chown -R "$USERNAME:$USERNAME" "$H/.config/git"
 mkdir -p "$H/.config"
 install -m 0644 "$PAYLOAD/home/config/starship.toml" "$H/.config/starship.toml"
 
@@ -118,6 +129,55 @@ run_user "curl -LsSf https://astral.sh/uv/install.sh | sh"
 
 # pnpm
 run_node "npm install -g pnpm"
+
+# Codex CLI + its config. Pinned to hq fleet's CODEX_TESTED_VERSION (`fleet doctor`
+# fails on an untested Codex). Merge only the [tui] keys: never clobber an existing file.
+CODEX_VERSION=0.159.0
+run_node "npm install -g @openai/codex@$CODEX_VERSION"
+# Stable `codex` and `pnpm` on PATH for non-interactive shells, systemd and fleet
+# windows (same reason and shape as the gws shim above).
+for t in codex pnpm; do
+  printf '%s\n' '#!/bin/sh' 'D="$HOME/.local/share/fnm/aliases/default/bin"' \
+    "PATH=\"\$D:\$PATH\" exec \"\$D/$t\" \"\$@\"" > "$H/.local/bin/$t"
+  chmod 0755 "$H/.local/bin/$t"
+  chown "$USERNAME:$USERNAME" "$H/.local/bin/$t"
+done
+# ~/.local/bin on every user unit's PATH (fleet windows, systemd-run). Named 999-
+# so it runs after Ubuntu's 99-environment.conf, which reloads /etc/environment.
+mkdir -p "$H/.config/environment.d"
+printf '%s\n' '# Stable tool shims (fleet, claude, codex, pnpm, gws, opencode) for every user unit.' \
+  'PATH=${HOME}/.local/bin:${PATH}' > "$H/.config/environment.d/999-local-bin.conf"
+chown -R "$USERNAME:$USERNAME" "$H/.config/environment.d"
+
+# opencode (a fleet provider). Pinned like Codex; ~/.opencode/bin is on PATH via .zshrc.
+OPENCODE_VERSION=1.18.32
+run_user "curl -fsSL https://opencode.ai/install | bash -s -- --version $OPENCODE_VERSION --no-modify-path"
+# ~/.opencode/bin is only on PATH in interactive zsh; link it for everything else.
+run_user "ln -sfn \"\$HOME/.opencode/bin/opencode\" \"\$HOME/.local/bin/opencode\""
+cat > /tmp/codex-tui-patch.py << 'CODEXPATCH'
+import os, re
+path = os.path.expanduser("~/.codex/config.toml")
+os.makedirs(os.path.dirname(path), exist_ok=True)
+want = {"alternate_screen": '"never"', "fullscreen_transcript": "false"}
+lines = open(path).read().splitlines() if os.path.exists(path) else []
+hdr = next((i for i, l in enumerate(lines) if l.strip() == "[tui]"), None)
+if hdr is None:
+    lines += ([""] if lines else []) + ["[tui]"] + [f"{k} = {v}" for k, v in want.items()]
+else:
+    end = next((i for i in range(hdr + 1, len(lines)) if lines[i].lstrip().startswith("[")), len(lines))
+    for k, v in want.items():
+        for i in range(hdr + 1, end):
+            if re.match(rf"\s*{k}\s*=", lines[i]):
+                lines[i] = f"{k} = {v}"
+                break
+        else:
+            lines.insert(hdr + 1, f"{k} = {v}")
+            end += 1
+open(path, "w").write("\n".join(lines) + "\n")
+CODEXPATCH
+chmod 0644 /tmp/codex-tui-patch.py
+run_user "python3 /tmp/codex-tui-patch.py"
+rm -f /tmp/codex-tui-patch.py
 
 # oh-my-zsh (unattended; keep our own .zshrc, don't chsh here)
 if [ ! -d "$H/.oh-my-zsh" ]; then
@@ -215,23 +275,38 @@ Type=forking
 User=$USERNAME
 WorkingDirectory=$H
 ExecStartPre=/bin/sh -c 'sleep 5'
-ExecStart=/usr/bin/vncserver :%i -localhost no -geometry 1920x1080 -depth 24
+ExecStart=/usr/bin/vncserver :%i -localhost yes -geometry 1920x1080 -depth 24
 ExecStop=/usr/bin/vncserver -kill :%i
 
 [Install]
 WantedBy=multi-user.target
 VNCUNIT
 
+# websockify binds the tailnet address only, never 0.0.0.0: wait for tailscale.
+cat > /usr/local/sbin/devbox-novnc << 'NOVNCWRAP'
+#!/bin/sh
+ip=
+for _ in $(seq 60); do
+  ip=$(tailscale ip -4 2>/dev/null | head -n1)
+  [ -n "$ip" ] && break
+  sleep 2
+done
+[ -n "$ip" ] || { echo "devbox-novnc: no tailscale IPv4 address" >&2; exit 1; }
+exec /usr/bin/websockify --web /usr/share/novnc "$ip:6080" localhost:5901
+NOVNCWRAP
+chmod 0755 /usr/local/sbin/devbox-novnc
+
 cat > /etc/systemd/system/novnc.service << NOVNCUNIT
 [Unit]
 Description=noVNC websocket proxy
-After=vncserver@1.service
+After=vncserver@1.service tailscaled.service
 
 [Service]
 Type=simple
 User=$USERNAME
-ExecStart=/usr/bin/websockify --web /usr/share/novnc 6080 localhost:5901
+ExecStart=/usr/local/sbin/devbox-novnc
 Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -243,7 +318,7 @@ systemctl daemon-reload
 # box (2026-10-06 stall). High CPU/IO weight + MemoryMin for both, Nice for
 # sshd (reset to 0 in login sessions by limits.conf), io delegated to user
 # managers so fleet.slice's IOWeight applies, and blk-iocost so IOWeight is
-# enforced at all. fleet.slice itself is installed by hq's `fleet.py up`.
+# enforced at all. fleet.slice itself is installed by hq's `fleet up`.
 G="$PAYLOAD/devbox-guard"
 for u in ssh.service tailscaled.service system.slice user@.service; do
   install -D -m 0644 "$G/$u.conf" "/etc/systemd/system/$u.d/90-devbox-guard.conf"

@@ -1,0 +1,139 @@
+# Switch over to dev-box
+
+The order to follow when moving from `dev-box-1` to `dev-box`, as of 2026-10-12. Each item shows who
+does it (**lead** or **Derick**) and when: **now**, or **move** (after the chief confirms fleet's
+clean day on `dev-box-1` passed, around 2026-10-13 19:10Z). Fleet is the native binary only; no
+`fleet.py` anywhere.
+`[x]` means done and verified. No logs, session history, fleet state or Docker volumes move. Repos
+are cloned fresh. Secrets, manifests and `.env` files never enter this repo.
+
+**How secrets move.** aide's Paste flow (hq `aide/README.md`, "Asking Derick for a key") saves a
+value on the machine aide runs on, which is `dev-box-1` until aide moves. A Paste therefore cannot
+put a value on `dev-box`. Values that already exist are copied file to file, under Derick's
+2026-10-12 permission, and never opened or printed. Paste is only for values that exist nowhere yet
+(new or rotated keys). None are needed now. Claude and Codex OAuth logins are never copied.
+
+## 1. Base
+
+- [x] `up.sh install`, `provision`, Tailscale node `dev-box`, `lockdown`. **lead**
+- [x] Logins: `claude login`, `codex login`, `gh auth login` + `gh auth setup-git`. **Derick**
+- [x] Repos cloned from the private manifest (`~/.config/dev-box/repos.tsv`, `clone-dev.sh`), with
+  every HEAD equal to origin and every tree clean. **lead**
+- [ ] Settle the push list on `dev-box-1` (`~/.config/dev-box/push-list.md`): repos with no remote,
+  client repos, protected branches, one diverged branch. **Derick, now**
+
+## 2. Secrets
+
+- [x] Google slots `personal` and `pymc`: credential files copied, `gwsa status --verify` OK. **lead**
+- [ ] `angkin`: its refresh token is expired on both machines. Run `gwsa login angkin` on `dev-box`.
+  **Derick, now**
+- [ ] `ce`: never logged in (its client secret is copied). Run `gwsa login ce` on `dev-box`. **Derick, now**
+- [x] TypeSafe key for sieve: `~/.config/sieve/env` plus the `.env` it sources. **lead**
+- [x] SSH keys still in use: the SiteGround key and one other deploy key, mode 600. `dev-box_ed25519`
+  stays where it is; `gcloud compute ssh` makes its own key on first use. **lead**
+- [x] `~/.claude` token files (Telegram, MiMo, provider and tool API keys). The dead `hcloud_token`
+  was left behind. **lead**
+- [x] Per-repo `.env` files for every cloned repo where git ignores `.env` (one repo tracks its own).
+  Repos with no remote are not cloned, so their `.env` waits on the push list. **lead**
+- [ ] aide Discord token (`~/.config/aide/discord_token`) and `~/.config/aide/config.toml`: copy when
+  aide moves (section 4). **lead, move**
+- [ ] Notion MCP: authorize it with `/mcp` inside `claude`. **Derick, now**
+- [ ] Optional: `vncpasswd` for noVNC. **Derick, now**
+
+## 3. Config
+
+- [x] `~/.claude/settings.json` (everything except hooks), `output-styles/`, `rules/`; user MCP
+  servers `daimon` and `sieve`. **lead**
+- [x] Personal skills in `~/.claude/skills`, linked from `~/.agents/skills`. Git-backed skills are
+  cloned from their remotes. Paseo skills are left out. **lead**
+- [x] `~/.codex/config.toml` top-level settings (model, approvals, sandbox, effort) merged above
+  `[tui]`. Codex re-adds project trust entries on first use. **lead**
+- [x] `setup.sh` re-run with this branch, so `files/` (claudex search, model-check, shared
+  instructions) matches the repo. **lead**
+- [x] hq-owned skills (`chief`, `lead`, `dispatch`, `advise`, `research-fanout`, `discord-catchup`)
+  linked from `~/dev/hq/skills` into `~/.claude/skills`, `~/.agents/skills` and `~/.codex/skills`;
+  the Codex `{low,medium,high}.config.toml` profiles copied. The fleet hooks come from
+  `fleet delegation install --native` (section 4). **lead**
+- [ ] Optional: the Android binder module, needed only for Android emulator work:
+  `apt install linux-modules-extra-$(uname -r)`, `modprobe binder_linux`, then persist it in
+  `/etc/modules-load.d/`. **lead, now on request**
+
+## 4. Services and timers
+
+User units only, bound to loopback or the tailnet address.
+
+- [x] sieve, with its SearXNG container (`bin/sieve-searxng start`, loopback). **lead**
+- [x] `gwsa check --notify` cron (08:30), installed by `setup.sh`. Both machines ping until
+  `dev-box-1` is gone. **lead**
+- [x] Fleet binary, fleet-watch and delegation hooks: `dedicated/post-hq.sh ~/dev/hq` with hq on
+  `main`. It builds `fleet-rs` with `CARGO_TARGET_DIR=/data/home/$USER/cargo-target/hq`
+  (`cargo build --release --locked -p fleet`), installs `~/.local/bin/fleet`, then runs
+  `fleet service install`, `fleet delegation install --native` and `fleet doctor`. `~/.local/bin`
+  is on the login PATH, so the tmux server and its hooks find plain `fleet`. Done 2026-10-13 from
+  hq `8c9d872` (sha256 `8ac56612…`, same as `dev-box-1`); Codex pinned to the tested version,
+  opencode installed, the `readonly-approve` hook added; `fleet doctor` PASS overall. **lead**
+- [ ] `fleet-hygiene` and `fleet-hygiene-uv` timers. Derick said on 2026-10-12 they are not needed;
+  the port keeps them, so `post-hq.sh --hygiene` installs them if wanted. **Derick decides, move**
+- [x] hqweb and `hqweb-cert.timer`: `uv sync` in `web/server`, `pnpm install && pnpm build` in
+  `web/client`, `deploy/renew-cert.sh`, copy the three units from `web/server/deploy/`, enable them.
+  Verified over the tailnet: client 200, valid TLS, `/api/health` clean; public port closed. **lead**
+- [ ] Reinstall the phone app from the `dev-box` address (push subscriptions are per address).
+  **Derick, now**
+- [x] aide installed but not started: runtime worktree `~/dev/hq-aide-runtime` at the same commit as
+  `dev-box-1`, `aide/install.sh` (unit written, disabled), `~/.config/aide/{discord_token,config.toml}`
+  and all of `~/.local/state/aide/` copied; a dry run (`--dry-run --once --fake-wording`) works and
+  leaves the state alone. **lead**
+- [x] aide cutover, 2026-10-13 05:59:44–46Z: disabled on `dev-box-1`, state re-synced, enabled on
+  `dev-box`; gateway ready, chief cursor identical on both. **lead**
+- [ ] alpha-mill daily timer: its effort recreates it later (it sends a fleet `say`). **lead, later**
+- [ ] The nightly Fly backup timer (`*-fly-backup`): waits on Derick's `fly auth login` on
+  `dev-box` (**Derick, now**); then the lead installs `flyctl` and the timer (**lead**). The
+  `dev-box-1` backup timer is now disabled, so no backup runs until it is installed on `dev-box`.
+- Not moving: the one-off `default-*` timers, paseo, and that app's bot.
+
+## 5. Docker
+
+- [ ] Rebuild each stack from its repo's compose or Supabase config when that work starts. No volume
+  copy; databases start empty. For example, the discord-bot Supabase stack: install the Supabase
+  CLI, then run `supabase start` in its repo. Docker publishes on 127.0.0.1 here, so ports that were
+  public on `dev-box-1` stay local. **lead, now (on demand)**
+- [ ] Per repo: `uv sync` or `pnpm install`; `playwright install` if needed. Run targeted tests only,
+  at most `pytest -n 2`. **lead, now (on demand)**
+
+## 6. Chief
+
+- [ ] Start a fresh chief on `dev-box`: `fleet up` (it also writes `fleet.slice`). No fleet state
+  is copied. Then run the smoke with `SMOKE_FLEET=1`. **Derick, move**
+
+## 7. Kill week for dev-box-1
+
+Changed 2026-10-13 (Derick): `dev-box-1` stays alive as a QA machine for one client stack that
+needs about 23 GB. Steps 4 and 6 are cancelled and step 5 stays pending. aide and the timers stay
+off there; sshd, the tmux `fleet` session and Tailscale stay on.
+
+1. [ ] Ongoing efforts finish or hand off. Re-run `dev-inventory.py` on both machines, push anything
+   safe, and settle the rest of the push list. **lead + Derick.** Done 2026-10-13: repos with no
+   remote and data folders that existed only on `dev-box-1` were copied with
+   `rsync -aR --ignore-existing`. Build output, `*-wt-*` worktrees and `.env`/`.dev.vars` files
+   were excluded. Tracked files inside excluded folders were restored from each repo's own `.git`,
+   and every copied repo's HEAD and dirty count matches `dev-box-1`. Before step 2, one git bundle
+   per repo of refs not on any remote, plus uncommitted work per worktree (patch and untracked
+   tarball; secret-shaped files never captured), went to `~/.config/dev-box/bundles` on `dev-box`.
+   Fleet agent records and Claude/Codex session transcripts were copied with `--ignore-existing`
+   (no auth files, no worktree trash). Two flagged branches were not pushed (pre-rebase copies of
+   merged PRs). **lead**
+2. [x] On `dev-box-1`: stop aide (only after it runs on `dev-box`), remove the `gwsa check` crontab
+   line, and disable the remaining timers. **lead.** Done 2026-10-13: aide off since the 05:59Z
+   cutover; `gwsa check` cron line removed, backup in `~/.config/dev-box`; the eight user timers
+   disabled; tmux fleet session, sshd, fleet-watch, hqweb and sieve left running.
+3. [ ] On `dev-box`: run `tests/smoke-dedicated.sh`, reboot, and run it again. From the laptop:
+   `tests/smoke-dedicated.sh --probe <public-ip>` must show every public port closed. **lead.**
+   2026-10-13, before the reboot: smoke with `SMOKE_FLEET=1` 37 PASS, 2 SKIP (hygiene timers),
+   0 FAIL after adding a `pnpm` shim like the `codex` one; probe from `dev-box-1`: all ten ports
+   closed. Deferred: the reboot and the second smoke run wait until Derick is not logged in on
+   `dev-box`.
+4. [ ] Delete the Cloud server (`tofu destroy` from the laptop, or the Hetzner console) and remove
+   its Tailscale node. **Derick.** Cancelled 2026-10-13: `dev-box-1` stays as a QA machine.
+5. [ ] Delete the legacy hcloud files from this repo and the local tofu state. **lead.** Pending
+   while `dev-box-1` is alive (its tofu state still manages it).
+6. [ ] Laptop: remove `dev-box-1` from `~/.ssh/config`. **Derick.** Cancelled 2026-10-13.
